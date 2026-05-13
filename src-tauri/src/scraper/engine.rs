@@ -219,47 +219,61 @@ impl ScraperEngine {
         }
         tracing::info!(task_id = %task_id, "CDP navigation succeeded");
 
-        // Wait for JS rendering to complete (max 5 seconds).
-        // Modern JD/taobao pages render content dynamically after initial load.
-        let wait_js = r#"
-            new Promise((resolve) => {
-                let elapsed = 0;
-                const interval = setInterval(() => {
-                    elapsed += 200;
-                    const hasTitle = document.querySelector('.sku-name, .itemInfo-wrap .sku-name, [class*="sku-name"]');
-                    const hasImages = document.querySelector('#spec-list img, .J-p-img img, #spec-n1 img');
-                    if ((hasTitle || hasImages) || elapsed >= 5000) {
-                        clearInterval(interval);
-                        resolve(true);
-                    }
-                }, 200);
-            })
+        // Wait for JS rendering: poll every 300ms up to 6 seconds.
+        // chromiumoxide's evaluate() defaults to awaitPromise:false, so Promise-based
+        // JS does NOT actually wait. Must use Rust-side sleep + synchronous JS checks.
+        let wait_check_js = r#"
+            (function() {
+                var hasTitle = document.querySelector('.sku-name, .itemInfo-wrap .sku-name, [class*="sku-name"]');
+                var hasImages = document.querySelector('#spec-list img, .J-p-img img, #spec-n1 img');
+                return !!(hasTitle || hasImages);
+            })()
         "#;
-        let _ = cdp.evaluate(wait_js).await;
+        let max_wait_ms: u32 = 6000;
+        let poll_interval_ms: u64 = 300;
+        let mut waited: u32 = 0;
+        loop {
+            match cdp.evaluate(wait_check_js).await {
+                Ok(v) if v.as_bool() == Some(true) => break,
+                _ => {}
+            }
+            waited += poll_interval_ms as u32;
+            if waited >= max_wait_ms {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(poll_interval_ms)).await;
+        }
 
-        // Scroll to trigger lazy loading of detail images.
-        // JD uses lazy loading that requires gradual scrolling, not jumping to bottom.
-        // We scroll step by step to trigger all lazy-loaded content.
-        let scroll_js = r#"
-            new Promise((resolve) => {
-                var totalHeight = document.body.scrollHeight;
-                var step = 500; // Scroll 500px each step
-                var current = 0;
-                var interval = setInterval(function() {
-                    current += step;
-                    window.scrollTo(0, current);
-                    if (current >= totalHeight) {
-                        clearInterval(interval);
-                        // Wait a bit then scroll back to top
-                        setTimeout(function() {
-                            window.scrollTo(0, 0);
-                            setTimeout(function() { resolve(true); }, 1000);
-                        }, 2000);
-                    }
-                }, 300); // 300ms between each scroll step
-            })
-        "#;
-        let _ = cdp.evaluate(scroll_js).await;
+        // Scroll step by step to trigger lazy loading of detail images.
+        // Uses synchronous JS + Rust-side tokio::time::sleep for timing —
+        // chromiumoxide's evaluate() defaults to awaitPromise:false so Promise-based
+        // scroll JS would return immediately without actually completing.
+        let height_result = cdp.evaluate("document.body.scrollHeight")
+            .await
+            .ok()
+            .and_then(|v| v.as_f64())
+            .unwrap_or(5000.0) as u32;
+
+        let step: u32 = 500;
+        let mut current: u32 = 0;
+        let scroll_delay_ms: u64 = 300;
+
+        while current < height_result {
+            current = (current + step).min(height_result);
+            let js = format!(
+                "(function() {{ window.scrollTo(0, {}); return document.body.scrollHeight; }})()",
+                current
+            );
+            let _ = cdp.evaluate(&js).await;
+            tokio::time::sleep(std::time::Duration::from_millis(scroll_delay_ms)).await;
+        }
+
+        // Wait 1.5s for lazy-loaded images to appear after scrolling.
+        tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+
+        // Scroll back to top.
+        let _ = cdp.evaluate("window.scrollTo(0, 0)").await;
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
         // Emit progress: page loading (30%).
         self.emit_progress(&task_id, 30, ScrapeStep::PageLoading, "Page loaded");
