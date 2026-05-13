@@ -1773,3 +1773,29 @@
 ---
 
 *本条目由 history agent 于 2026-05-11 归档。基于本轮对话全文原文（用户 bug report → planner 诊断 → backend 修复 jd.rs + utils.rs → cargo check/test 验证通过）完整归档：京东解析器修复——详情图片从 `getAttribute('style')` 改为 `getComputedStyle()` 提取 CSS background-image，avif→jpg 格式转换顺序调整，扩展查询范围和回退逻辑。139/139 测试全部通过。这是 MVP-1 完成后的首次 bug 修复维护事件。*
+
+---
+
+### 2026-05-13 — Windows CI 构建修复：tauri.conf.json 添加 .ico 图标引用
+
+- **[项目状态确认]** Human 询问"我们做了什么"。planner 读取 STATUS.md、HISTORY.md、AGENTS.md 确认项目当前状态：MVP-1 全部 7 个 Phase 100% 完成，Phase 7 打包交付已完成 macOS DMG 5.1MB 构建并通过 reviewer 审计。Windows 构建仍存在问题。
+- **[问题诊断 — Windows MSI 构建缺少 .ico 图标]** planner 读取 `src-tauri/tauri.conf.json` 第 34 行 `bundle.icon` 数组，发现仅有 4 个 PNG 格式图标（`32x32.png`、`128x128.png`、`128x128@2x.png`、`icon.png`），缺少 Windows MSI 打包所需的 `.ico` 格式图标，导致构建失败（`Couldn't find a .ico icon`）。
+- **[maintainer 修复执行]** planner 调度 maintainer：在 `tauri.conf.json` 的 `bundle.icon` 数组末尾追加 `"icons/icon.ico"`。
+  - **修复内容**：`bundle.icon` 数组从 4 个图标扩展为 5 个，新增 `"icons/icon.ico"`
+  - **前置条件验证**：`src-tauri/icons/icon.ico` 文件已存在于项目中，无需额外创建文件
+  - **修复确认**：maintainer 汇报修复成功
+- **[STATUS.md 同步更新]**（planner 执行）
+  - 任务 #9（双平台打包测试）备注更新：追加 "Windows 构建修复：tauri.conf.json 已添加 icon.ico"
+  - 决策记录新增：「Windows CI 构建修复 — tauri.conf.json 中 bundle.icon 缺少 .ico 格式图标，maintainer 在 icon 数组中添加 "icons/icon.ico"」
+- **[事件性质]** 这是一项小型配置修复：问题根因不是文件缺失（`icons/icon.ico` 已存在），而是 `tauri.conf.json` 配置引用遗漏。修复仅需修改一行配置，不涉及代码变更或回归测试。
+
+- **[当前进度快照]**
+  - MVP-1 全部 7 个 Phase：100% 🏆
+  - **Windows CI 构建修复：100% ✅**
+  - **京东解析器 bug 修复：100% ✅**
+  - **总体进度：100%**（MVP-1 维护期，两轮修复均完成）
+  - **测试数：139/139 ✅**（无回归，纯配置修改）
+
+---
+
+*本条目由 history agent 于 2026-05-13 归档。基于本轮全部 7 段对话原文完整归档：Human 状态查询 → planner 诊断 Windows CI 构建缺少 .ico 图标 → maintainer 配置修复 tauri.conf.json → STATUS.md 同步更新。问题根因为配置引用遗漏而非文件缺失，纯配置修复，无代码变更。*

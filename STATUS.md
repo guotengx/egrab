@@ -37,7 +37,7 @@
 | 6 | 本地存档系统（SQLite+JSON+文件） | backend | ✅ 已完成 | src-tauri/src/storage/ 完整实现，含 7 个单元测试 |
 | 7 | 基础UI界面 | frontend | ✅ 已完成 | 页面+组件+数据流全部完成并验证通过：UrlInput→onSubmit→Home→tasksStore.startScrape→currentTask→Progress；tsc 零错误 |
 | 8 | 前后端IPC联调 | architect | ✅ 已完成 | 全部 11 个 IPC 命令已注册，83 个测试通过 |
-| 9 | 双平台打包测试 | maintainer | ✅ 已完成 | macOS DMG 5.1MB 构建成功，reviewer 审计通过；Windows 需 CI 环境 |
+| 9 | 双平台打包测试 | maintainer | ✅ 已完成 | macOS DMG 5.1MB 构建成功，reviewer 审计通过；Windows 构建修复：tauri.conf.json 已添加 icon.ico |
 | 10 | 抓取引擎（scraper） | backend | ✅ 已完成 | src-tauri/src/scraper/engine.rs 实现完整抓取流程：CDP→Parser→Downloader→Storage |
 | 11 | IPC 命令注册 | backend | ✅ 已完成 | start_scrape/cancel_scrape/get_task_history/get_task_detail/open_folder 全部已注册 |
 
@@ -240,6 +240,7 @@ kimi-k2.6（tester）在执行异步任务时，反复出现"成功态不收敛"
 | 2026-05-10 | **三角色模型变更**：人类确认 kimi-k2.6 因成功态不收敛（4次）且不支持 temperature 自定义，从 tester 移至 fallback（temperature=1）；tester 改用 stepfun/step-3.5-flash（轻量快速，适合执行型任务）；maintainer 改用 alibaba/qwen3.6-plus（1M 上下文，适合运维复杂配置）。opencode.json + 3 份 contract 已同步更新 | 人类 + planner + pre |
 | 2026-05-10 | **Phase 7 打包交付完成**：maintainer 完成 macOS 生产构建（DMG 5.1MB，远低于 15MB 限制），修复 2 项配置问题（identifier 改为 com.egrab.desktop 避免 .app 冲突，移除损坏的 icns/ico 图标文件）。reviewer 运维/配置审计全部通过（配置变更合理、依赖一致、安全配置无问题）。MVP-1 全部 7 个 Phase 完成 | maintainer + reviewer + planner |
 | 2026-05-11 | **京东解析器修复**：用户报告 detail_images 和 specs 为空。backend 修复：① 详情图片改用 `getComputedStyle()` 提取 CSS background-image（原代码只检查内联 style，但京东样式在 `<style>` 标签中通过 class 定义）；② avif→jpg 格式转换重构（先转格式再移除尺寸前缀）；③ 扩展查询范围到 `#detail-main` 和 `#detail-top`。139/139 测试通过 | backend + planner |
+| 2026-05-13 | **Windows CI 构建修复**：tauri.conf.json 中 bundle.icon 缺少 .ico 格式图标，导致 Windows MSI 打包失败（`Couldn't find a .ico icon`）。maintainer 在 icon 数组中添加 `"icons/icon.ico"`。文件已存在于 `src-tauri/icons/icon.ico`，仅需配置引用 | maintainer + planner |
 
 ---
 
