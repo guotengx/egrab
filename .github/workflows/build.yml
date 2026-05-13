@@ -3,6 +3,7 @@ name: Build EGrab
 on:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 jobs:
@@ -68,3 +69,29 @@ jobs:
         with:
           name: EGrab-Windows-x64
           path: src-tauri/target/release/bundle/msi/*.msi
+
+  # ===== Release (tag push only) =====
+  release:
+    needs: [build-macos, build-windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: EGrab-macOS-aarch64
+          path: artifacts/macos
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: EGrab-Windows-x64
+          path: artifacts/windows
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          files: |
+            artifacts/macos/*.dmg
+            artifacts/windows/*.msi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
