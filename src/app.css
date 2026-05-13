@@ -1,0 +1,104 @@
+/* EGrab - Global Styles */
+/* Tailwind CSS v4 with DESIGN.md design tokens (Raycast-inspired dark theme) */
+
+@import "tailwindcss";
+
+/* Inter font with ss03 stylistic set - Raycast signature typography */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+@theme {
+  /* Brand & Primary */
+  --color-primary: #ffffff;
+  --color-primary-pressed: #e8e8e8;
+  --color-on-primary: #000000;
+
+  /* Surface Ladder - 4-step elevation without shadows */
+  --color-canvas: #07080a;
+  --color-surface: #0d0d0d;
+  --color-surface-elevated: #101111;
+  --color-surface-card: #121212;
+  --color-button-fg: #18191a;
+
+  /* Borders - hairline system, no shadows */
+  --color-hairline: #242728;
+  --color-hairline-soft: rgba(255, 255, 255, 0.08);
+  --color-hairline-strong: rgba(255, 255, 255, 0.16);
+
+  /* Text - tonal hierarchy on dark canvas */
+  --color-ink: #f4f4f6;
+  --color-body: #cdcdcd;
+  --color-charcoal: #d3d3d4;
+  --color-mute: #9c9c9d;
+  --color-ash: #6a6b6c;
+  --color-stone: #434345;
+  --color-on-dark: #ffffff;
+  --color-on-dark-mute: rgba(255, 255, 255, 0.72);
+
+  /* Semantic Accents - reserved for status indicators only */
+  --color-accent-blue: #57c1ff;
+  --color-accent-blue-soft: rgba(87, 193, 255, 0.15);
+  --color-accent-red: #ff6161;
+  --color-accent-red-soft: rgba(255, 97, 97, 0.15);
+  --color-accent-green: #59d499;
+  --color-accent-green-soft: rgba(89, 212, 153, 0.15);
+  --color-accent-yellow: #ffc533;
+  --color-accent-yellow-soft: rgba(255, 197, 51, 0.15);
+
+  /* Keycap Gradient */
+  --color-key-bg-start: #121212;
+  --color-key-bg-end: #0d0d0d;
+
+  /* Border Radius Scale */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Spacing Extensions */
+  --spacing-xxs: 2px;
+  --spacing-xs: 4px;
+  --spacing-section: 96px;
+
+  /* Font Family - Inter with ss03 stylistic set */
+  --font-sans: 'Inter', 'Inter Fallback', system-ui, sans-serif;
+}
+
+/* Base styles - dark-only mode, no light variant */
+html,
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: "calt", "kern", "liga", "ss03";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-canvas);
+  color: var(--color-body);
+}
+
+/* No shadows anywhere - elevation via surface ladder only */
+* {
+  box-shadow: none !important;
+}
+
+/* --- Status Pulse Animation (Connecting/Reconnecting) --- */
+@keyframes status-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+}
+
+.animate-status-pulse {
+  animation: status-pulse 1.2s ease-in-out infinite;
+}
+
+/* --- Nav brand letter styling --- */
+.brand-letter {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}

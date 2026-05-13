@@ -1,0 +1,408 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "openrouter/anthropic/claude-opus-4-7",
+  "small_model": "openrouter/anthropic/claude-haiku-4.5",
+  "default_agent": "planner",
+  "autoupdate": true,
+  "instructions": [
+    "AGENTS.md",
+    "docs/PRD.md",
+    "docs/ARCHITECTURE.md"
+  ],
+  "provider": {
+    "openrouter": {
+      "options": {
+        "baseURL": "https://openrouter.ai/api/v1",
+        "apiKey": "{env:OPENROUTER_API_KEY}"
+      }
+    },
+    "moonshotai": {
+      "options": {
+        "baseURL": "https://api.moonshot.cn/v1",
+        "apiKey": "{env:MOONSHOT_API_KEY}"
+      }
+    },
+    "zhipuai": {
+      "options": {
+        "baseURL": "https://open.bigmodel.cn/api/paas/v4",
+        "apiKey": "{env:ZHIPU_API_KEY}"
+      }
+    },
+    "deepseek": {
+      "options": {
+        "baseURL": "https://api.deepseek.com/",
+        "apiKey": "{env:DEEPSEEK_API_KEY}"
+      }
+    },
+    "xiaomi": {
+      "options": {
+        "baseURL": "https://token-plan-cn.xiaomimimo.com/v1",
+        "apiKey": "{env:XIAOMI_API_KEY}"
+      }
+    },
+    "minimax-cn": {
+      "options": {
+        "baseURL": "https://api.minimaxi.com/anthropic/v1",
+        "apiKey": "{env:MINIMAX_API_KEY}"
+      }
+    },
+    "stepfun": {
+      "options": {
+        "baseURL": "https://api.stepfun.com/v1",
+        "apiKey": "{env:STEPFUN_API_KEY}"
+      }
+    },
+    "alibaba": {
+      "options": {
+        "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "apiKey": "{env:DASHSCOPE_API_KEY}"
+      }
+    }
+  },
+  "permission": {
+    "read": {
+      "*": "allow",
+      "**/.env*": "ask",
+      "**/.git/**": "ask"
+    },
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "webfetch": "allow",
+    "edit": "ask",
+    "bash": {
+      "*": "ask",
+      "ls *": "allow",
+      "cat *": "allow",
+      "grep *": "allow",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git add*": "allow",
+      "git commit*": "ask",
+      "git push*": "ask",
+      "npm run dev*": "allow",
+      "npm run build*": "allow",
+      "npm run tauri*": "allow",
+      "npm install*": "allow",
+      "npx --yes tsc*": "allow",
+      "npx --yes tsc --noEmit*": "allow",
+      "npx --yes prettier*": "allow",
+      "cargo check*": "allow",
+      "cargo build*": "allow",
+      "cargo test*": "allow",
+      "cargo fmt*": "allow",
+      "cargo clippy*": "allow",
+      "./async_run.sh*": "allow",
+      "tail *": "allow"
+    }
+  },
+  "agent": {
+    "pre": {
+      "description": "【制宪者】项目初始化时运行一次生成宪法文件；当PRD/ARCHITECTURE发生人类确认变更时经授权可重运行。负责阅读 PRD 和 ARCHITECTURE，为所有角色生成不可变的契约文档(docs/contract-*.md)和接口协议文档(docs/protocols/*.md)。",
+      "mode": "subagent",
+      "model": "openrouter/openai/gpt-5.5",
+      "reasoningEffort": "high",
+      "temperature": 0.1,
+      "color": "#FFD700",
+      "prompt": "{file:./docs/pre-mandate.md}",
+      "permission": {
+        "edit": {
+          "*": "ask",
+          "docs/contract-*.md": "allow",
+          "docs/protocols/*.md": "allow",
+          "docs/protocols/**": "allow"
+        },
+        "bash": {
+          "*": "ask",
+          "./async_run.sh*": "allow",
+          "tail *": "allow"
+        },
+        "task": "ask"
+      }
+    },
+    "planner": {
+      "description": "【项目经理/CEO】负责统筹全局，业务需求拆解、里程碑管理。唯一调度者：直接调度 architect, frontend, backend, tester, reviewer, maintainer, history, fallback；qa 可由任何 Agent 调用。向人类汇报前必须先调度history压缩上下文。",
+      "mode": "primary",
+      "model": "xiaomi/mimo-v2.5-pro",
+      "temperature": 0.2,
+      "color": "#FF6B6B",
+      "prompt": "{file:./docs/contract-planner.md}",
+      "permission": {
+        "edit": {
+          "*": "ask",
+          "STATUS.md": "allow"
+        },
+        "bash": {
+          "*": "ask",
+          "./async_run.sh*": "allow",
+          "tail *": "allow"
+        },
+        "task": {
+          "*": "ask",
+          "architect": "allow",
+          "frontend": "allow",
+          "backend": "allow",
+          "tester": "allow",
+          "maintainer": "allow",
+          "history": "allow",
+          "fallback": "allow",
+          "qa": "allow",
+          "pre": "allow",
+          "reviewer": "allow"
+        }
+      }
+    },
+    "architect": {
+      "description": "【技术总监/CTO】负责接收planner的业务需求，进行架构设计和接口定义，维护TECH_BOARD.md。不得调度frontend/backend/tester/reviewer，只能向planner提出后续任务建议；规划前端组件时必须遵循UI设计规范（必要时读取DESIGN.md原文）。完成后直接向planner汇报。",
+      "mode": "subagent",
+      "model": "zhipuai/glm-5.1",
+      "temperature": 0.2,
+      "color": "#9B59B6",
+      "prompt": "{file:./docs/contract-architect.md}",
+      "permission": {
+        "edit": {
+          "*": "ask",
+          "src/protocols/**": "allow",
+          "src-tauri/src/models/**": "allow",
+          "TECH_BOARD.md": "allow"
+        },
+        "bash": {
+          "*": "ask",
+          "cargo check*": "allow",
+          "cargo build*": "allow",
+          "npx --yes tsc --noEmit*": "allow",
+          "ls *": "allow",
+          "cat *": "allow",
+          "./async_run.sh*": "allow",
+          "tail *": "allow"
+        },
+        "task": {
+          "*": "ask",
+          "qa": "allow"
+        }
+      }
+    },
+    "frontend": {
+      "description": "【前端开发】负责Svelte 5 + TypeScript的UI开发。必须严格实现src/protocols/中定义的接口类型。必须严格遵循UI设计规范（必要时读取DESIGN.md原文）。遇到技术难题可调用qa咨询。完成后直接向planner汇报。",
+      "mode": "subagent",
+      "model": "zhipuai/glm-5v-turbo",
+      "temperature": 0.3,
+      "color": "#3498DB",
+      "prompt": "{file:./docs/contract-frontend.md}",
+      "permission": {
+        "edit": {
+          "*": "ask",
+          "src/pages/**": "allow",
+          "src/components/**": "allow",
+          "src/stores/**": "allow",
+          "src/services/**": "allow",
+          "src/types/**": "allow",
+          "src/App.svelte": "allow",
+          "src/main.ts": "allow"
+        },
+        "bash": {
+          "*": "ask",
+          "npm run dev*": "allow",
+          "npm run build*": "allow",
+          "npx --yes tsc --noEmit*": "allow",
+          "npx --yes prettier*": "allow",
+          "ls *": "allow",
+          "cat *": "allow",
+          "./async_run.sh*": "allow",
+          "tail *": "allow"
+        },
+        "task": {
+          "*": "ask",
+          "qa": "allow"
+        }
+      }
+    },
+    "backend": {
+      "description": "【后端开发】负责Rust/Tauri后端开发。必须严格实现src/protocols/中定义的接口。包括CDP管理、平台解析器、下载器、存储引擎。遇到技术难题可调用qa咨询。完成后直接向planner汇报。",
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-pro",
+      "temperature": 0.2,
+      "color": "#27AE60",
+      "prompt": "{file:./docs/contract-backend.md}",
+      "permission": {
+        "edit": {
+          "*": "ask",
+          "src-tauri/src/**": "allow"
+        },
+        "bash": {
+          "*": "ask",
+          "cargo check*": "allow",
+          "cargo build*": "allow",
+          "cargo test*": "allow",
+          "cargo fmt*": "allow",
+          "cargo clippy*": "allow",
+          "cargo run*": "allow",
+          "ls *": "allow",
+          "cat *": "allow",
+          "./async_run.sh*": "allow",
+          "tail *": "allow"
+        },
+        "task": {
+          "*": "ask",
+          "qa": "allow"
+        }
+      }
+    },
+    "tester": {
+      "description": "【测试工程师】负责自动化测试编写与执行。根据src/protocols/中的接口定义编写测试用例。遇到报错无法理解时可调用qa协助分析。完成后直接向planner汇报。",
+      "mode": "subagent",
+      "model": "stepfun/step-3.5-flash",
+      "temperature": 0.2,
+      "color": "#F39C12",
+      "prompt": "{file:./docs/contract-tester.md}",
+      "permission": {
+        "edit": {
+          "*": "ask",
+          "tests/**": "allow",
+          "src-tauri/tests/**": "allow"
+        },
+        "bash": {
+          "*": "ask",
+          "cargo test*": "allow",
+          "npm run test*": "allow",
+          "ls *": "allow",
+          "cat *": "allow",
+          "./async_run.sh*": "allow",
+          "tail *": "allow"
+        },
+        "task": {
+          "*": "ask",
+          "qa": "allow"
+        }
+      }
+    },
+    "qa": {
+      "description": "【全知顾问/技术神谕】无任何修改代码或执行命令的权限。唯一职责是利用广博知识和搜索能力，回答其他Agent提出的技术疑难杂症，给出解决思路和代码示例。任何Agent均可越级直接调用。",
+      "mode": "subagent",
+      "model": "openrouter/anthropic/claude-opus-4.7",
+      "temperature": 0.3,
+      "color": "#E74C3C",
+      "prompt": "{file:./docs/contract-qa.md}",
+      "permission": {
+        "edit": "ask",
+        "bash": {
+          "*": "ask",
+          "./async_run.sh*": "allow",
+          "tail *": "allow"
+        },
+        "webfetch": "allow",
+        "task": "ask"
+      }
+    },
+    "history": {
+      "description": "【史官】负责将当前阶段的对话和执行日志压缩提炼为增量式时间线报告，追加到HISTORY.md中。去除冗余报错日志，保留核心决策和进度里程碑。",
+      "mode": "subagent",
+      "model": "deepseek/deepseek-v4-flash",
+      "temperature": 0.1,
+      "color": "#95A5A6",
+      "prompt": "{file:./docs/contract-history.md}",
+      "permission": {
+        "edit": {
+          "*": "ask",
+          "HISTORY.md": "allow"
+        },
+        "bash": {
+          "*": "ask",
+          "./async_run.sh*": "allow",
+          "tail *": "allow"
+        },
+        "task": "ask"
+      }
+    },
+    "reviewer": {
+      "description": "【一致性审计】负责代码规范、安全审查、配置/协议/工作流一致性验证。只读权限，不修改任何代码。所有审计任务均由planner直接调度，完成后直接向planner汇报。",
+      "mode": "subagent",
+      "model": "minimax-cn/MiniMax-M2.7",
+      "temperature": 0.1,
+      "color": "#8E44AD",
+      "prompt": "{file:./docs/contract-reviewer.md}",
+      "permission": {
+        "edit": "ask",
+        "bash": {
+          "*": "ask",
+          "cargo clippy*": "allow",
+          "npx --yes tsc --noEmit*": "allow",
+          "ls *": "allow",
+          "cat *": "allow",
+          "grep *": "allow",
+          "./async_run.sh*": "allow",
+          "tail *": "allow"
+        },
+        "task": {
+          "*": "ask",
+          "qa": "allow"
+        }
+      }
+    },
+    "maintainer": {
+      "description": "【运维】负责CI/CD配置、构建脚本、依赖管理、跨平台打包配置。可接棒完成运维/配置/部署工作，完成后由planner调度reviewer审计。",
+      "mode": "subagent",
+      "model": "alibaba/qwen3.6-plus",
+      "temperature": 0.2,
+      "color": "#16A085",
+      "prompt": "{file:./docs/contract-maintainer.md}",
+      "permission": {
+        "edit": {
+          "*": "ask",
+          "*.yml": "allow",
+          "*.yaml": "allow",
+          "Dockerfile": "allow",
+          "Cargo.toml": "allow",
+          "src-tauri/Cargo.toml": "allow",
+          "src-tauri/tauri.conf.json": "allow",
+          "package.json": "allow",
+          "tsconfig.json": "allow",
+          "vite.config.*": "allow",
+          "svelte.config.*": "allow",
+          "tailwind.config.*": "allow"
+        },
+        "bash": {
+          "*": "ask",
+          "npm install*": "allow",
+          "npm run build*": "allow",
+          "npm run tauri build*": "allow",
+          "npm run tauri dev*": "allow",
+          "cargo build*": "allow",
+          "cargo install*": "allow",
+          "ls *": "allow",
+          "cat *": "allow",
+          "./async_run.sh*": "allow",
+          "tail *": "allow"
+        },
+        "task": {
+          "*": "ask",
+          "qa": "allow"
+        }
+      }
+    },
+    "fallback": {
+      "description": "【破局者】当系统陷入死锁时介入。拥有最高权限进行底层重构或跨模块修复。仅在planner确认常规链路无法解决或系统死锁时由planner调度。",
+      "mode": "subagent",
+      "model": "moonshotai/kimi-k2.6",
+      "temperature": 1,
+      "color": "#C0392B",
+      "prompt": "{file:./docs/contract-fallback.md}",
+      "permission": {
+        "edit": "allow",
+        "bash": "allow",
+        "task": {
+          "*": "ask",
+          "qa": "allow"
+        }
+      }
+    }
+  },
+  "mcp": {
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true
+    }
+  }
+}

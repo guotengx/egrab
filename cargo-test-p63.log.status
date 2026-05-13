@@ -1,0 +1,5 @@
+COMMAND=cargo test --manifest-path src-tauri/Cargo.toml --test scraper_test
+STARTED_AT=2026-05-10 04:48:59
+STATE=FINISHED
+EXIT_CODE=0
+FINISHED_AT=2026-05-10 04:49:08

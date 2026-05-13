@@ -1,0 +1,5 @@
+COMMAND=cargo test --manifest-path src-tauri/Cargo.toml
+STARTED_AT=2026-05-13 16:45:46
+STATE=RUNNING
+EXIT_CODE=
+FINISHED_AT=

@@ -1,0 +1,5 @@
+COMMAND=cargo check --manifest-path src-tauri/Cargo.toml
+STARTED_AT=2026-05-11 02:13:18
+STATE=FINISHED
+EXIT_CODE=101
+FINISHED_AT=2026-05-11 02:13:27

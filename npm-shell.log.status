@@ -1,0 +1,5 @@
+COMMAND=npm install @tauri-apps/plugin-shell --registry=https://registry.npmmirror.com
+STARTED_AT=2026-05-11 00:16:42
+STATE=FINISHED
+EXIT_CODE=0
+FINISHED_AT=2026-05-11 00:16:44

@@ -1,0 +1,70 @@
+name: Build EGrab
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # ===== macOS aarch64 =====
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Tauri
+        run: npm run tauri build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: EGrab-macOS-aarch64
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+
+  # ===== Windows x86_64 =====
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install WebView2
+        run: |
+          # WebView2 is pre-installed on windows-latest runner
+          echo "WebView2 is available"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Tauri
+        run: npm run tauri build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: EGrab-Windows-x64
+          path: src-tauri/target/release/bundle/msi/*.msi

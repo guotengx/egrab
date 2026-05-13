@@ -1,0 +1,5 @@
+COMMAND=cargo test --manifest-path src-tauri/Cargo.toml --lib -- parser::utils downloader::image
+STARTED_AT=2026-05-11 17:02:54
+STATE=FINISHED
+EXIT_CODE=101
+FINISHED_AT=2026-05-11 17:03:02

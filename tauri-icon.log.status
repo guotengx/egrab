@@ -1,0 +1,5 @@
+COMMAND=npx --yes @tauri-apps/cli icon /Users/xuguoteng/Documents/opencode_temp/eclient/icon-source.png
+STARTED_AT=2026-05-10 21:38:29
+STATE=FINISHED
+EXIT_CODE=0
+FINISHED_AT=2026-05-10 21:38:33
