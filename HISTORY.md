@@ -1799,3 +1799,59 @@
 ---
 
 *本条目由 history agent 于 2026-05-13 归档。基于本轮全部 7 段对话原文完整归档：Human 状态查询 → planner 诊断 Windows CI 构建缺少 .ico 图标 → maintainer 配置修复 tauri.conf.json → STATUS.md 同步更新。问题根因为配置引用遗漏而非文件缺失，纯配置修复，无代码变更。*
+
+---
+
+### 2026-05-13（续 — GitHub SSH 推送配置 + CI 双平台构建触发 + 自动 Release 工作流上线）
+
+- **[人类调度 — 继续构建 Windows 客户端]** 人类发出指令要求继续构建 Windows 客户端。planner 检查项目状态发现 `.github/workflows/build.yml` 已有 Windows 构建 job（build-windows），但需先修复 `.ico` 图标引用（此前条目已完成修复）。git 仓库有 3 个修改文件待提交（2026-05-11 京东解析器修复 + 2026-05-13 .ico 配置修复）。
+
+- **[SSH 推送配置完成]（Human → planner 执行）**
+  - 初始推送失败：`Permission denied (publickey)` — 本地无有效 SSH 密钥可访问 `git@github.com:guotengx/egrab.git`
+  - 人类提供新生成的 SSH 公钥（`id_ed25519_github.pub`）并要求添加到 GitHub SSH Keys
+  - planner 检查本地 `~/.ssh/`，发现两对密钥（`id_ed25519` 旧密钥 + `id_ed25519_github` 新密钥），确认新密钥公钥与人类提供的一致
+  - 创建 `~/.ssh/config` 指定 GitHub 专用密钥，SSH 认证测试成功（`Hi guotengx! You've successfully authenticated`）
+  - **推送成功**：`origin/main` 推送完成，CI 自动触发双平台构建（macOS + Windows）
+
+- **[gh CLI 发布尝试受阻]（planner 执行）**
+  - CI 构建完成后，人类要求将构建产物发布到 GitHub Releases
+  - planner 尝试安装 gh CLI (`brew install gh`) 进行手动发布，但 `gh auth login` 需要浏览器交互，无法在终端完成
+  - **决策转换**：改为 CI 自动化 release 方案，避免每次发布依赖人工操作
+
+- **[maintainer — build.yml 新增 release job 完成]（planner 调度）**
+  - planner 调度 maintainer 在 `.github/workflows/build.yml` 新增 release job，核心规范：
+    - **触发条件**：推送 `v*` 标签（如 `v0.1.0`）
+    - **依赖**：`needs: [build-macos, build-windows]`，确保 dual-platform build 成功后执行
+    - **下载产物**：`actions/download-artifact@v4` 下载两个平台的构建产物
+    - **发布**：`softprops/action-gh-release@v2` 创建 GitHub Release，自动附加 macOS DMG + Windows MSI
+  - **修改内容**（两处）：
+    1. `push` 触发器新增 `tags: ['v*']` — 允许标签触发构建（非 release 时仅构建不发布）
+    2. 新增 `release` job — 仅在 tag 推送时触发，构建成功后自动创建 Release
+  - 现有 `build-macos` / `build-windows` job 未修改，构建逻辑不变
+
+- **[v0.1.0 标签推送 + CI 触发]（planner 执行）**
+  - **提交 CI 变更**：`git commit -m "ci: add auto-release job on version tag push"`
+  - **打标签**：`git tag v0.1.0` — 首次版本标签
+  - **推送双线**：`git push origin main`（分支） + `git push origin v0.1.0`（标签），推送全部成功 ✅
+  - **CI 自动触发**：v0.1.0 标签触发 CI 全流程，macOS DMG + Windows MSI 构建完成后，release job 自动创建 GitHub Release 并附加产物
+
+- **[里程碑意义]**
+  - **GitHub 推送链路打通**：从 SSH 密钥配置到仓库推送，再到 CI 自动触发，形成完整的代码提交流程
+  - **自动化 Release 上线**：从手动 gh CLI 发布尝试受挫，到 CI 自动化 release job 落地，实现了"打标签即发布"的理想工作流
+  - **v0.1.0 首版发布**：v0.1.0 版本标签的创建标志着 EGrab 正式进入版本化管理，CI 自动构建 + 发布工作流已就绪
+
+- **[当前进度快照]**
+  - **MVP-1：100% 🏆**（全部 7 个 Phase 完成）
+  - **Phase 7 打包交付：100% ✅**（macOS DMG 5.1MB ✅ | Windows CI 构建修复 ✅ | 自动 Release 工作流上线 ✅）
+  - **GitHub 推送链路：100% ✅**
+  - **CI/CD 流水线：build（push 触发）+ release（v* 标签触发）— 全部就绪 ✅**
+  - **版本化管理：v0.1.0 ✅**
+  - **总体进度：100%**（MVP-1 维护期，CI/CD 基础设施升级完成）
+
+- **[关键决策记录]**
+  - 手动 gh CLI 发布 → 自动 CI release：gh auth login 的浏览器交互限制导致手动发布不可行，转向 CI 自动化方案
+  - SSH 密钥策略：issue 专用密钥 + `~/.ssh/config` 指定，避免与已有密钥冲突
+
+---
+
+*本条目由 history agent 于 2026-05-13 归档。基于本轮 9 段对话全文原文完整归档：SSH 推送配置（密钥 + config + 认证成功）→ CI 触发双平台构建 → gh CLI 发布受阻 → 转向 CI 自动化（maintainer 新增 release job）→ v0.1.0 标签推送触发全自动发布。GitHub 推送链路打通，CI/CD 流水线就绪（build+release 双触发模式），首版本 v0.1.0 已发布。*

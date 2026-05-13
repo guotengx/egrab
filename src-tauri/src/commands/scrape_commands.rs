@@ -76,6 +76,8 @@ pub async fn start_scrape(
                 "task_id": tid,
                 "error": format!("Scrape task panicked: {}", panic_msg),
                 "recoverable": false,
+                "error_code": ErrorCode::UnknownError,
+                "step": ScrapeStep::Connecting,
             });
             let _ = app_handle_bg.emit("scrape:error", &payload);
         }

@@ -1,7 +1,7 @@
 // EGrab - Events Protocol (L5)
 // Derived from: docs/protocols/events.md v1.0.0
 
-import type { ConnectionState, ScrapeStep, TaskResult } from './data-models';
+import type { ConnectionState, ErrorCode, ScrapeStep, TaskResult } from './data-models';
 
 export interface ScrapeProgressPayload {
   task_id: string;
@@ -19,6 +19,8 @@ export interface ScrapeErrorPayload {
   task_id: string;
   error: string;
   recoverable: boolean;
+  error_code: ErrorCode;
+  step: ScrapeStep;
 }
 
 export type CdpStateChangedPayload = ConnectionState;

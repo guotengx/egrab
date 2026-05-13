@@ -8,7 +8,7 @@
 ## 类型定义
 
 ```ts
-import type { ConnectionState, ScrapeStep, TaskResult } from './data-models';
+import type { ConnectionState, ErrorCode, ScrapeStep, TaskResult } from './data-models';
 
 /** 抓取进度事件 payload。 */
 export interface ScrapeProgressPayload {
@@ -38,6 +38,10 @@ export interface ScrapeErrorPayload {
   error: string;
   /** 是否可恢复；true 表示流程可继续或可降级。 */
   recoverable: boolean;
+  /** 来自后端的机器可读错误码，使用 SCREAMING_SNAKE_CASE 枚举。 */
+  error_code: ErrorCode;
+  /** 发生错误时的抓取阶段，使用 snake_case 枚举。 */
+  step: ScrapeStep;
 }
 
 /** CDP 连接状态变更 payload 直接使用 ConnectionState。 */

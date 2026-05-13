@@ -124,8 +124,8 @@ function createTasksStore() {
           }
           if (currentTask && currentTask.task_id === payload.task_id) {
             const newError: ScrapeErrorInfo = {
-              step: currentTask.step,
-              code: 'UNKNOWN_ERROR',
+              step: payload.step,
+              code: payload.error_code,
               message: payload.error,
               recoverable: payload.recoverable,
             };

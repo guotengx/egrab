@@ -12,7 +12,7 @@
 use crate::cdp::CdpManager;
 use crate::downloader::{DownloadImageInput, ImageDownloader};
 use crate::models::{
-    ErrorCode, IpcError, ScrapeStep, TaskResult, TaskStatus, TaskUpdate,
+    ConnectionState, ErrorCode, IpcError, ScrapeStep, TaskResult, TaskStatus, TaskUpdate,
 };
 use crate::parser::{self, PageHandle};
 use crate::storage::StorageEngine;
@@ -96,7 +96,13 @@ impl ScraperEngine {
         let platform_parser = match parser::find_parser(&url) {
             Some(p) => p,
             None => {
-                self.emit_error(&task_id, "No parser found for URL", false);
+                self.emit_error(
+                    &task_id,
+                    "No parser found for URL",
+                    false,
+                    ErrorCode::UnsupportedPlatform,
+                    ScrapeStep::Connecting,
+                );
                 self.fail_task(&task_id).await;
                 return;
             }
@@ -112,7 +118,13 @@ impl ScraperEngine {
                 Ok(detail) => detail.task.folder_path,
                 Err(e) => {
                     drop(storage_guard);
-                    self.emit_error(&task_id, &e.message, e.recoverable);
+                    self.emit_error(
+                        &task_id,
+                        &e.message,
+                        e.recoverable,
+                        e.code,
+                        e.step.unwrap_or(ScrapeStep::Connecting),
+                    );
                     return;
                 }
             }
@@ -130,7 +142,13 @@ impl ScraperEngine {
                 },
             ) {
                 drop(storage_guard);
-                self.emit_error(&task_id, &e.message, e.recoverable);
+                self.emit_error(
+                    &task_id,
+                    &e.message,
+                    e.recoverable,
+                    e.code,
+                    e.step.unwrap_or(ScrapeStep::Connecting),
+                );
                 return;
             }
         }
@@ -140,6 +158,39 @@ impl ScraperEngine {
 
         // Step 3: Navigate to URL via CDP.
         let cdp = self.app_handle.state::<CdpManager>();
+
+        // Step 2.5: Ensure CDP is connected before navigating.
+        let cdp_status = cdp.status().await;
+        if !matches!(cdp_status, ConnectionState::Connected { .. }) {
+            self.emit_progress(
+                &task_id,
+                15,
+                ScrapeStep::Connecting,
+                "正在自动检测浏览器连接...",
+            );
+            match cdp.auto_connect().await {
+                Ok(_info) => {
+                    self.emit_progress(
+                        &task_id,
+                        20,
+                        ScrapeStep::Connecting,
+                        "浏览器已连接，正在导航...",
+                    );
+                }
+                Err(e) => {
+                    self.emit_error(
+                        &task_id,
+                        &e.message,
+                        e.recoverable,
+                        e.code,
+                        ScrapeStep::Connecting,
+                    );
+                    self.fail_task(&task_id).await;
+                    return;
+                }
+            }
+        }
+
         tracing::info!(task_id = %task_id, url = %url, "Navigating to URL via CDP...");
         if let Err(e) = cdp.navigate(&url).await {
             tracing::error!(task_id = %task_id, error = ?e, "CDP navigation failed");
@@ -157,7 +208,13 @@ impl ScraperEngine {
                     },
                 );
             }
-            self.emit_error(&task_id, &e.message, e.recoverable);
+            self.emit_error(
+                &task_id,
+                &e.message,
+                e.recoverable,
+                e.code,
+                e.step.unwrap_or(ScrapeStep::PageLoading),
+            );
             return;
         }
         tracing::info!(task_id = %task_id, "CDP navigation succeeded");
@@ -217,7 +274,13 @@ impl ScraperEngine {
         let parse_result = match platform_parser.parse(&page_handle).await {
             Ok(result) => result,
             Err(e) => {
-                self.emit_error(&task_id, &format!("Parse failed: {}", e), true);
+                self.emit_error(
+                    &task_id,
+                    &format!("Parse failed: {}", e),
+                    true,
+                    ErrorCode::ParseFailed,
+                    ScrapeStep::Parsing,
+                );
                 self.fail_task(&task_id).await;
                 return;
             }
@@ -245,9 +308,15 @@ impl ScraperEngine {
                         folder_path: None,
                     },
                 ) {
-                    drop(storage_guard);
-                    self.emit_error(&task_id, &e.message, e.recoverable);
-                    return;
+                drop(storage_guard);
+                self.emit_error(
+                    &task_id,
+                    &e.message,
+                    e.recoverable,
+                    e.code,
+                    e.step.unwrap_or(ScrapeStep::Downloading),
+                );
+                return;
                 }
 
                 let task_result = TaskResult {
@@ -342,7 +411,13 @@ impl ScraperEngine {
                 },
             ) {
                 drop(storage_guard);
-                self.emit_error(&task_id, &e.message, e.recoverable);
+                self.emit_error(
+                    &task_id,
+                    &e.message,
+                    e.recoverable,
+                    e.code,
+                    e.step.unwrap_or(ScrapeStep::Saving),
+                );
                 return;
             }
 
@@ -466,17 +541,28 @@ impl ScraperEngine {
     }
 
     /// Emits a scrape:error event.
-    fn emit_error(&self, task_id: &str, error: &str, recoverable: bool) {
+    fn emit_error(
+        &self,
+        task_id: &str,
+        error: &str,
+        recoverable: bool,
+        error_code: ErrorCode,
+        step: ScrapeStep,
+    ) {
         tracing::warn!(
             task_id = %task_id,
             error = %error,
             recoverable = recoverable,
+            error_code = ?error_code,
+            step = ?step,
             "Emitting error"
         );
         let payload = serde_json::json!({
             "task_id": task_id,
             "error": error,
             "recoverable": recoverable,
+            "error_code": error_code,
+            "step": step,
         });
         let _ = self.app_handle.emit("scrape:error", &payload);
     }
