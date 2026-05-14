@@ -220,3 +220,29 @@ export async function getCoverImage(taskId: string): Promise<string> {
     throw toIpcError(err);
   }
 }
+
+/**
+ * Resize oversized images in a task's local folder.
+ * IPC command: `resize_images`
+ */
+export async function resizeImages(taskId: string): Promise<{
+  total: number;
+  resized: number;
+  skipped: number;
+  failed: number;
+  details: Array<{
+    path: string;
+    original_width: number;
+    original_height: number;
+    new_width: number | null;
+    new_height: number | null;
+    action: string;
+    error: string | null;
+  }>;
+}> {
+  try {
+    return await invoke('resize_images', { taskId });
+  } catch (err) {
+    throw toIpcError(err);
+  }
+}

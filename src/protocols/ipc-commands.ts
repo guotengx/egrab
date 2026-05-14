@@ -95,6 +95,27 @@ export interface SetConfigCommand {
   returns: boolean;
 }
 
+export interface ResizeImagesCommand {
+  name: 'resize_images';
+  params: { task_id: string };
+  returns: {
+    total: number;
+    resized: number;
+    skipped: number;
+    failed: number;
+    details: Array<{
+      path: string;
+      original_width: number;
+      original_height: number;
+      new_width: number | null;
+      new_height: number | null;
+      action: string;
+      error: string | null;
+    }>;
+  };
+  errors: 'UNKNOWN_ERROR';
+}
+
 export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: IpcError };
 
 export type IpcCommand =
@@ -110,4 +131,5 @@ export type IpcCommand =
   | OpenFolderCommand
   | DeleteTaskCommand
   | GetConfigCommand
-  | SetConfigCommand;
+  | SetConfigCommand
+  | ResizeImagesCommand;

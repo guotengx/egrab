@@ -6,6 +6,7 @@
   import TaskCard from '../components/TaskCard.svelte';
   import { tasksStore } from '../stores/tasks.svelte';
   import type { Platform, TaskStatus } from '../protocols';
+  import { resizeImages as ipcResizeImages } from '../services/ipc';
 
   interface Props {
     onNavigate?: (page: string) => void;
@@ -129,6 +130,35 @@
       });
     } catch {
       return isoString;
+    }
+  }
+
+  // --- Resize Images State & Handler ---
+  let resizeResult = $state<{
+    total: number;
+    resized: number;
+    skipped: number;
+    failed: number;
+  } | null>(null);
+  let resizeLoading = $state(false);
+  let resizeError = $state<string | null>(null);
+
+  async function handleResizeImages(taskId: string): Promise<void> {
+    resizeLoading = true;
+    resizeError = null;
+    resizeResult = null;
+    try {
+      const result = await ipcResizeImages(taskId);
+      resizeResult = {
+        total: result.total,
+        resized: result.resized,
+        skipped: result.skipped,
+        failed: result.failed,
+      };
+    } catch (err) {
+      resizeError = err instanceof Error ? err.message : String(err);
+    } finally {
+      resizeLoading = false;
     }
   }
 </script>
@@ -291,16 +321,43 @@
                   <!-- Meta Info -->
                   <div class="pt-2 border-t border-hairline flex items-center justify-between">
                     <span class="text-stone text-xs">抓取时间: {formatTime(task.created_at)}</span>
-                    {#if task.folder_path}
-                      <button
-                        type="button"
-                        onclick={() => handleOpenFolder(task.folder_path ?? undefined)}
-                        class="text-mute hover:text-on-dark transition-colors cursor-pointer bg-transparent border-none text-xs p-0 underline"
-                      >
-                        打开文件夹
-                      </button>
-                    {/if}
+                    <div class="flex items-center gap-3">
+                      {#if task.folder_path}
+                        <button
+                          type="button"
+                          onclick={() => handleOpenFolder(task.folder_path ?? undefined)}
+                          class="text-mute hover:text-on-dark transition-colors cursor-pointer bg-transparent border-none text-xs p-0 underline"
+                        >
+                          打开文件夹
+                        </button>
+                        <button
+                          type="button"
+                          onclick={() => handleResizeImages(task.id)}
+                          class="text-mute hover:text-on-dark transition-colors cursor-pointer bg-transparent border-none text-xs p-0 underline"
+                        >
+                          压缩图片
+                        </button>
+                      {/if}
+                    </div>
                   </div>
+
+                  <!-- Resize Result Feedback -->
+                  {#if resizeLoading}
+                    <p class="text-mute text-xs pt-2">压缩中...</p>
+                  {/if}
+                  {#if resizeResult}
+                    <p class="text-mute text-xs pt-2">
+                      压缩完成：共 {resizeResult.total} 张，
+                      已压缩 {resizeResult.resized} 张，
+                      跳过 {resizeResult.skipped} 张
+                      {#if resizeResult.failed > 0}
+                        ，失败 {resizeResult.failed} 张
+                      {/if}
+                    </p>
+                  {/if}
+                  {#if resizeError}
+                    <p class="text-accent-red text-xs pt-2">{resizeError}</p>
+                  {/if}
                 </div>
               {/if}
             </div>

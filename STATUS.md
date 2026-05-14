@@ -242,6 +242,7 @@ kimi-k2.6（tester）在执行异步任务时，反复出现"成功态不收敛"
 | 2026-05-11 | **京东解析器修复**：用户报告 detail_images 和 specs 为空。backend 修复：① 详情图片改用 `getComputedStyle()` 提取 CSS background-image（原代码只检查内联 style，但京东样式在 `<style>` 标签中通过 class 定义）；② avif→jpg 格式转换重构（先转格式再移除尺寸前缀）；③ 扩展查询范围到 `#detail-main` 和 `#detail-top`。139/139 测试通过 | backend + planner |
 | 2026-05-13 | **Windows CI 构建修复**：tauri.conf.json 中 bundle.icon 缺少 .ico 格式图标，导致 Windows MSI 打包失败（`Couldn't find a .ico icon`）。maintainer 在 icon 数组中添加 `"icons/icon.ico"`。文件已存在于 `src-tauri/icons/icon.ico`，仅需配置引用 | maintainer + planner |
 | 2026-05-13 | **CI 自动 Release**：maintainer 在 build.yml 新增 release job，推送 v* 标签时自动创建 GitHub Release 并附加 macOS DMG + Windows MSI。已推送 v0.1.0 标签触发首次 Release | maintainer + planner |
+| 2026-05-13 | **懒加载滚动修复（detail 目录为空）**：根因是 chromiumoxide `page.evaluate()` 默认 `awaitPromise: false`，导致 JS `new Promise(...)` 的 setInterval/scrollTo 未执行完就被丢弃。改为 Rust 侧 `tokio::time::sleep` 循环 + 同步 JS。修复影响全平台 | backend + planner |
 
 ---
 

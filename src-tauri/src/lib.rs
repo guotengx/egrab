@@ -7,6 +7,7 @@ pub mod config;
 pub mod downloader;
 pub mod models;
 pub mod parser;
+pub mod resize;
 pub mod scraper;
 pub mod storage;
 
@@ -84,6 +85,7 @@ pub fn run() {
             commands::task_commands::delete_task,
             commands::task_commands::open_folder,
             commands::task_commands::get_cover_image,
+            commands::resize_commands::resize_images,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
