@@ -10,7 +10,10 @@ pub use config::{
     AppConfig, BrowserLaunchCommand, BrowserOs, BrowserType, MetaJsonDocument, RawJsonDocument,
 };
 pub use connection::{CdpEndpoint, ConnectionInfo, ConnectionState, TabInfo};
-pub use product::{Description, ImageRef, PriceRange, ProductData, ShopInfo, SkuItem, SpecItem};
+pub use product::{
+    Description, ImageRef, PriceRange, ProductData, ResizeDetail, ResizeResult, ShopInfo, SkuItem,
+    SpecItem,
+};
 pub use task::{
     DuplicateTaskConflict, ErrorCode, ImageIndexInput, ImageRecord, ImageType, IpcError,
     ScrapeErrorInfo, ScrapeStep, Task, TaskDetail, TaskFilter, TaskResult, TaskStatus, TaskSummary,

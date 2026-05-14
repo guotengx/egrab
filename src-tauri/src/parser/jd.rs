@@ -379,11 +379,9 @@ impl super::PlatformParser for JdParser {
         // Step 6: Extract detail images via JavaScript.
         //
         // Strategy (priority order):
-        // 1. #zbViewWeChatMiniImages[value] — JD ships a comma-separated list of all
-        //    detail image paths in this hidden element. This is the most reliable source.
-        // 2. .ssd-module elements — JD detail sections use CSS background-image bound
-        //    via class selectors in injected <style> tags. Use getComputedStyle().
-        // 3. <img> tags fallback in plausible detail containers.
+        // 1. #zbViewWeChatMiniImages[value] — comma-separated mobile detail image paths
+        // 2. <style> tags — extract background-image:url() references for .ssd-module
+        // 3. getComputedStyle() fallback on .ssd-module elements
         let detail_images_js = r#"
             (function() {
                 var urls = [];
@@ -411,10 +409,22 @@ impl super::PlatformParser for JdParser {
                     return 'https://img30.360buyimg.com' + p;
                 }
 
-                // Strategy 1: Parse <style> tags directly (RELIABLE - no layout dependency)
+                // Strategy 1: Extract from #zbViewWeChatMiniImages (mobile detail images)
+                var zbEl = document.getElementById('zbViewWeChatMiniImages');
+                if (zbEl && zbEl.value) {
+                    var zbPaths = zbEl.value.split(',');
+                    debug.zbPathsCount = zbPaths.length;
+                    for (var z = 0; z < zbPaths.length; z++) {
+                        var p = zbPaths[z].trim();
+                        if (p) {
+                            push(toAbs(p));
+                        }
+                    }
+                }
+                debug.urlsAfterZb = urls.length;
+
+                // Strategy 2: Parse <style> tags directly (RELIABLE - no layout dependency)
                 // JD injects ssd-module backgrounds via CSS rules in <style> tags.
-                // We do NOT use #zbViewWeChatMiniImages because its mobile-CDN URLs
-                // differ from the desktop-CDN URLs in <style> tags, causing duplicates.
                 var styleText = '';
                 var styleNodes = document.querySelectorAll('style');
                 debug.styleCount = styleNodes.length;
@@ -442,9 +452,11 @@ impl super::PlatformParser for JdParser {
                         if (end === -1) break;
                         var url = text.substring(idx, end).trim();
                         url = url.replace(/^["']+|["']+$/g, '');
-                        // Only include JD product images, exclude icon/tool images
-                        var isProductImg = url.indexOf('/sku/') !== -1 || url.indexOf('/pcpubliccms/') !== -1;
-                        if (url.indexOf('360buyimg.com') !== -1 && isProductImg) {
+                        // Filter: must be on JD CDN domain and have image file extension
+                        var isJdCdn = url.indexOf('360buyimg.com') !== -1 || url.indexOf('jd.com') !== -1;
+                        var isImageExt = /\.(jpg|jpeg|png|avif|webp|bmp|gif)($|\?|#)/i.test(url);
+                        var isNotUtility = url.indexOf('/icon') === -1 && url.indexOf('/tool') === -1 && url.indexOf('/sprite') === -1;
+                        if (isJdCdn && isImageExt && isNotUtility) {
                             push(toAbs(url));
                         }
                         idx = end + 1;

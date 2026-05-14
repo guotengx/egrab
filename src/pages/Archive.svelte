@@ -335,7 +335,7 @@
                           onclick={() => handleResizeImages(task.id)}
                           class="text-mute hover:text-on-dark transition-colors cursor-pointer bg-transparent border-none text-xs p-0 underline"
                         >
-                          压缩图片
+                          等比缩放
                         </button>
                       {/if}
                     </div>
@@ -343,13 +343,13 @@
 
                   <!-- Resize Result Feedback -->
                   {#if resizeLoading}
-                    <p class="text-mute text-xs pt-2">压缩中...</p>
+                    <p class="text-mute text-xs pt-2">缩放中...</p>
                   {/if}
                   {#if resizeResult}
                     <p class="text-mute text-xs pt-2">
-                      压缩完成：共 {resizeResult.total} 张，
-                      已压缩 {resizeResult.resized} 张，
-                      跳过 {resizeResult.skipped} 张
+                      缩放完成：共 {resizeResult.total} 张，
+                      已缩放 {resizeResult.resized} 张，
+                      已跳过 {resizeResult.skipped} 张
                       {#if resizeResult.failed > 0}
                         ，失败 {resizeResult.failed} 张
                       {/if}

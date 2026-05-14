@@ -66,3 +66,40 @@ pub struct SpecItem {
     pub key: String,
     pub value: String,
 }
+
+/// Result of a resize operation on a single image.
+/// Output goes to `proportioned/` subdirectory; originals are never modified.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct ResizeResult {
+    /// Total images scanned
+    pub total: u32,
+    /// Images that were resized
+    pub resized: u32,
+    /// Images that were skipped (already within limits)
+    pub skipped: u32,
+    /// Images that failed to process
+    pub failed: u32,
+    /// Details for each image
+    pub details: Vec<ResizeDetail>,
+}
+
+/// Detail of a single image resize operation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub struct ResizeDetail {
+    /// Image file path
+    pub path: String,
+    /// Original width in pixels
+    pub original_width: u32,
+    /// Original height in pixels
+    pub original_height: u32,
+    /// New width after resize (None if skipped)
+    pub new_width: Option<u32>,
+    /// New height after resize (None if skipped)
+    pub new_height: Option<u32>,
+    /// Action taken: "resized", "skipped", or "failed"
+    pub action: String,
+    /// Error message (only present when action="failed")
+    pub error: Option<String>,
+}

@@ -1,40 +1,19 @@
 // EGrab - Image Resize Module
 // Detects and resizes oversized product images with proportional scaling.
 
-use crate::models::{ErrorCode, IpcError, ScrapeStep};
+use crate::models::{ErrorCode, IpcError, ResizeDetail, ResizeResult, ScrapeStep};
 use std::path::Path;
-
-/// Result of a resize operation on a single image.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct ResizeResult {
-    /// Total images scanned
-    pub total: u32,
-    /// Images that were resized
-    pub resized: u32,
-    /// Images that were skipped (already within limits)
-    pub skipped: u32,
-    /// Images that failed to process
-    pub failed: u32,
-    /// Details for each image
-    pub details: Vec<ResizeDetail>,
-}
-
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct ResizeDetail {
-    pub path: String,
-    pub original_width: u32,
-    pub original_height: u32,
-    pub new_width: Option<u32>,
-    pub new_height: Option<u32>,
-    pub action: String, // "resized", "skipped", "failed"
-    pub error: Option<String>,
-}
 
 const MAX_WIDTH: u32 = 1080; // 1200 * 0.9
 const MAX_HEIGHT: u32 = 1350; // 1500 * 0.9
 
 /// Resize all images in a folder (cover/, gallery/, detail/, sku/ subdirs).
-pub fn resize_images_in_folder(folder_path: &str) -> Result<ResizeResult, IpcError> {
+/// Resized images are written to `{folder_path}/{output_base_name}/` preserving the
+/// original subdirectory structure. Originals are never modified.
+pub fn resize_images_in_folder(
+    folder_path: &str,
+    output_base_name: &str,
+) -> Result<ResizeResult, IpcError> {
     let base = Path::new(folder_path);
     if !base.exists() || !base.is_dir() {
         return Err(IpcError {
@@ -45,6 +24,15 @@ pub fn resize_images_in_folder(folder_path: &str) -> Result<ResizeResult, IpcErr
             details: None,
         });
     }
+
+    let output_base = base.join(output_base_name);
+    std::fs::create_dir_all(&output_base).map_err(|e| IpcError {
+        code: ErrorCode::UnknownError,
+        message: format!("Failed to create output directory: {}", e),
+        recoverable: true,
+        step: Some(ScrapeStep::Saving),
+        details: None,
+    })?;
 
     let mut result = ResizeResult {
         total: 0,
@@ -81,7 +69,7 @@ pub fn resize_images_in_folder(folder_path: &str) -> Result<ResizeResult, IpcErr
 
                 result.total += 1;
 
-                match process_single_image(&path) {
+                match process_single_image(&path, base, &output_base) {
                     Ok(detail) => {
                         if detail.action == "resized" {
                             result.resized += 1;
@@ -110,7 +98,11 @@ pub fn resize_images_in_folder(folder_path: &str) -> Result<ResizeResult, IpcErr
     Ok(result)
 }
 
-fn process_single_image(path: &Path) -> Result<ResizeDetail, String> {
+fn process_single_image(
+    path: &Path,
+    base_dir: &Path,
+    output_base: &Path,
+) -> Result<ResizeDetail, String> {
     let img = image::open(path).map_err(|e| format!("Failed to open: {}", e))?;
     let (w, h) = (img.width(), img.height());
 
@@ -134,13 +126,22 @@ fn process_single_image(path: &Path) -> Result<ResizeDetail, String> {
     let new_w = (w as f64 * scale).round() as u32;
     let new_h = (h as f64 * scale).round() as u32;
 
+    // Compute output path preserving relative structure under output_base
+    let relative = path
+        .strip_prefix(base_dir)
+        .map_err(|e| format!("strip prefix: {}", e))?;
+    let output_path = output_base.join(relative);
+    if let Some(parent) = output_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("create dir: {}", e))?;
+    }
+
     let resized = img.resize_exact(new_w, new_h, image::imageops::FilterType::Lanczos3);
     resized
-        .save(path)
+        .save(&output_path)
         .map_err(|e| format!("Failed to save: {}", e))?;
 
     Ok(ResizeDetail {
-        path: path.to_string_lossy().to_string(),
+        path: output_path.to_string_lossy().to_string(),
         original_width: w,
         original_height: h,
         new_width: Some(new_w),

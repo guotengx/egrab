@@ -376,6 +376,8 @@ impl ScraperEngine {
         // Step 6: Save results via StorageEngine.
         self.emit_progress(&task_id, 95, ScrapeStep::Saving, "Saving results");
 
+        let final_status;
+        let mut errors;
         {
             let storage_guard = storage.lock().await;
 
@@ -401,7 +403,7 @@ impl ScraperEngine {
             }
 
             // Determine final task status.
-            let final_status = if download_result.failed > 0 && download_result.success > 0 {
+            final_status = if download_result.failed > 0 && download_result.success > 0 {
                 TaskStatus::Partial
             } else if download_result.failed > 0 && download_result.success == 0 {
                 TaskStatus::Failed
@@ -409,7 +411,7 @@ impl ScraperEngine {
                 TaskStatus::Success
             };
 
-            let mut errors = parse_result.errors;
+            errors = parse_result.errors;
             for result in &download_result.results {
                 if let Some(ref err) = result.error {
                     errors.push(err.clone());
@@ -434,23 +436,51 @@ impl ScraperEngine {
                 );
                 return;
             }
+        } // storage_guard dropped
 
-            // Emit final progress and complete event.
-            self.emit_progress(&task_id, 100, ScrapeStep::Completed, "Scrape complete");
-
-            let task_result = TaskResult {
-                task_id: task_id.clone(),
-                status: final_status,
-                folder_path,
-                product: Some(product),
-                image_total: download_result.total,
-                image_success: download_result.success,
-                image_failed: download_result.failed,
-                errors,
-            };
-
-            self.emit_complete(&task_id, &task_result);
+        // Auto-resize images to proportioned/ subdirectory.
+        // Resize failure does NOT cause the task to be marked Failed.
+        if let Some(ref fp) = folder_path {
+            self.emit_progress(&task_id, 97, ScrapeStep::Saving, "Resizing images");
+            let fp_clone = fp.clone();
+            match tokio::task::spawn_blocking(move || {
+                crate::resize::resize_images_in_folder(&fp_clone, "proportioned")
+            })
+            .await
+            {
+                Ok(Ok(resize_result)) => {
+                    tracing::info!(
+                        "Auto-resize complete: total={} resized={} skipped={} failed={}",
+                        resize_result.total,
+                        resize_result.resized,
+                        resize_result.skipped,
+                        resize_result.failed,
+                    );
+                }
+                Ok(Err(e)) => {
+                    tracing::warn!("Auto-resize failed: {:?}", e);
+                }
+                Err(e) => {
+                    tracing::warn!("Auto-resize spawn_blocking failed: {:?}", e);
+                }
+            }
         }
+
+        // Emit final progress and complete event.
+        self.emit_progress(&task_id, 100, ScrapeStep::Completed, "Scrape complete");
+
+        let task_result = TaskResult {
+            task_id: task_id.clone(),
+            status: final_status,
+            folder_path,
+            product: Some(product),
+            image_total: download_result.total,
+            image_success: download_result.success,
+            image_failed: download_result.failed,
+            errors,
+        };
+
+        self.emit_complete(&task_id, &task_result);
     }
 
     /// Helper: marks a task as Failed in storage with best-effort semantics.

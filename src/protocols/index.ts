@@ -35,6 +35,8 @@ export type {
   AppConfig,
   MetaJsonDocument,
   RawJsonDocument,
+  ResizeDetail,
+  ResizeResult,
 } from './data-models';
 
 export type {
@@ -42,6 +44,7 @@ export type {
   CdpDisconnectCommand,
   CdpStatusCommand,
   CdpListTabsCommand,
+  CdpAutoConnectCommand,
   StartScrapeCommand,
   CancelScrapeCommand,
   GetTaskHistoryCommand,
@@ -50,6 +53,7 @@ export type {
   DeleteTaskCommand,
   GetConfigCommand,
   SetConfigCommand,
+  ResizeImagesCommand,
   IpcResult,
   IpcCommand,
 } from './ipc-commands';

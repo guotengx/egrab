@@ -6,6 +6,7 @@ import type {
   ConnectionInfo,
   ConnectionState,
   IpcError,
+  ResizeResult,
   TabInfo,
   TaskDetail,
   TaskFilter,
@@ -98,21 +99,7 @@ export interface SetConfigCommand {
 export interface ResizeImagesCommand {
   name: 'resize_images';
   params: { task_id: string };
-  returns: {
-    total: number;
-    resized: number;
-    skipped: number;
-    failed: number;
-    details: Array<{
-      path: string;
-      original_width: number;
-      original_height: number;
-      new_width: number | null;
-      new_height: number | null;
-      action: string;
-      error: string | null;
-    }>;
-  };
+  returns: ResizeResult;
   errors: 'UNKNOWN_ERROR';
 }
 

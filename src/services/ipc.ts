@@ -7,6 +7,7 @@ import type {
   AppConfig,
   ConnectionInfo,
   ConnectionState,
+  ResizeResult,
   TabInfo,
   TaskDetail,
   TaskFilter,
@@ -225,23 +226,9 @@ export async function getCoverImage(taskId: string): Promise<string> {
  * Resize oversized images in a task's local folder.
  * IPC command: `resize_images`
  */
-export async function resizeImages(taskId: string): Promise<{
-  total: number;
-  resized: number;
-  skipped: number;
-  failed: number;
-  details: Array<{
-    path: string;
-    original_width: number;
-    original_height: number;
-    new_width: number | null;
-    new_height: number | null;
-    action: string;
-    error: string | null;
-  }>;
-}> {
+export async function resizeImages(taskId: string): Promise<ResizeResult> {
   try {
-    return await invoke('resize_images', { taskId });
+    return await invoke<ResizeResult>('resize_images', { taskId });
   } catch (err) {
     throw toIpcError(err);
   }

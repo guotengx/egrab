@@ -9,7 +9,7 @@ use crate::storage::StorageEngine;
 pub async fn resize_images(
     task_id: String,
     storage: tauri::State<'_, tokio::sync::Mutex<StorageEngine>>,
-) -> Result<crate::resize::ResizeResult, IpcError> {
+) -> Result<crate::models::ResizeResult, IpcError> {
     let folder_path = {
         let guard = storage.lock().await;
         let detail = guard.get_task_detail(&task_id)?;
@@ -23,7 +23,7 @@ pub async fn resize_images(
     };
 
     // Run the CPU-bound resize in a blocking task to avoid blocking the async runtime.
-    let result = tokio::task::spawn_blocking(move || resize_images_in_folder(&folder_path))
+    let result = tokio::task::spawn_blocking(move || resize_images_in_folder(&folder_path, "proportioned"))
         .await
         .map_err(|e| IpcError {
             code: crate::models::ErrorCode::UnknownError,

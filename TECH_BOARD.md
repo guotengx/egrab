@@ -37,6 +37,7 @@
 | pages | src/pages/ | 页面组件（Home, Progress, Archive, Settings） | frontend | ✅ done | - | ✅ tsc |
 | components | src/components/ | 可复用UI组件 | frontend | ✅ done | - | ✅ tsc |
 | stores | src/stores/ | Svelte状态管理（连接状态、任务状态等） | frontend | ✅ done | - | ✅ tsc |
+| resize | src-tauri/src/resize/ | 图片等比缩放（输出到 proportioned/ 子目录） | backend | 🔄 重构中 | L5 data-models | 🔲 待更新 |
 | services | src/services/ | Tauri IPC调用封装 | frontend | ✅ done | L5 ipc-commands | ✅ tsc |
 
 ---
@@ -57,6 +58,7 @@
 | get_config | ✅ done | ✅ done | ✅ 类型对齐 |
 | set_config | ✅ done | ✅ done | ✅ 类型对齐 |
 | cdp_auto_connect | 🔲 L5 defined | 🔲 pending | 🔲 pending |
+| resize_images | ✅ done | ✅ done | 🔄 返回类型需对齐 ResizeResult |
 
 ---
 
@@ -266,6 +268,39 @@ Phase 5（前后端开发）和 Phase 6（测试联调）的代码质量、接�
 ### 结论
 Phase 5 和 Phase 6 全面检查通过。代码质量良好，接口一致性全链路零差异，131 个测试全部通过，reviewer 一致性审计通过。D-1 到 D-9 均为已记录的 P1/P2 延后项，不阻塞 Phase 7 打包交付。建议 Phase 7 优先处理 D-7（tauri.conf.json CSP 配置）。
 
+### TD-008: 图片等比缩放架构重构 — 输出到 proportioned/ 子目录
+
+- **日期**: 2026-05-15
+- **决策**: 将 resize 模块从"原地覆盖原图"改为"输出到 `proportioned/` 子目录，保持原图不动"，并在 scraper engine 抓取完成后自动调用
+- **变更**:
+  1. `src-tauri/src/resize/mod.rs`：`resize_images_in_folder` 函数签名不变，但内部逻辑从 `resized.save(path)` 改为 `resized.save(proportioned_path)`，输出到 `{folder}/proportioned/{cover,gallery,detail,sku}/` 子目录
+  2. `src-tauri/src/scraper/engine.rs`：`run_scrape` 方法在 Step 6（保存结果）之后、emit complete 之前，自动调用 `resize_images_in_folder` 对当前任务文件夹执行等比缩放
+  3. `src/protocols/data-models.ts`：新增 `ResizeResult` 和 `ResizeDetail` 类型定义，供前端使用
+  4. `src/protocols/ipc-commands.ts`：`ResizeImagesCommand.returns` 从内联对象改为引用 `ResizeResult` 类型
+  5. `src/services/ipc.ts`：`resizeImages` 返回类型从内联改为 `ResizeResult`
+  6. `src/pages/Archive.svelte`：已有"压缩图片"按钮，需更新文案为"等比缩放"
+- **原因**: 用户需求——抓取时自动处理 + 前端手动触发 + 原图不动 + 只等比缩放不压缩
+- **目录结构变更**:
+  ```
+  taobao_12345678_20260505T143022/
+  ├── meta.json
+  ├── raw.json
+  ├── cover/             # 原图（不动）
+  ├── gallery/           # 原图（不动）
+  ├── detail/            # 原图（不动）
+  ├── sku/               # 原图（不动）
+  └── proportioned/      # 新增：等比缩放输出
+      ├── cover/
+      ├── gallery/
+      ├── detail/
+      └── sku/
+  ```
+- **影响范围**:
+  - **backend**：`resize/mod.rs`（核心逻辑改为输出到 proportioned/）、`scraper/engine.rs`（新增自动调用）、`commands/resize_commands.rs`（无需改动，已通过 folder_path 调用）
+  - **frontend**：`services/ipc.ts`（返回类型对齐 ResizeResult）、`pages/Archive.svelte`（按钮文案更新）
+  - **architect**：`src/protocols/data-models.ts`（新增类型）、`src/protocols/ipc-commands.ts`（引用新类型）、`src/protocols/index.ts`（导出新类型）
+  - **tester**：需新增 resize 输出到 proportioned/ 的测试用例
+
 ---
 
-*最后更新: 2026-05-10 by architect (新增 cdp_auto_connect IPC 命令)*
+*最后更新: 2026-05-15 by architect (TD-008: 图片等比缩放架构重构)*

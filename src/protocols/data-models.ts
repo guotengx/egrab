@@ -220,3 +220,35 @@ export interface RawJsonDocument {
   raw_data: JsonObject;
   parser_errors: ScrapeErrorInfo[];
 }
+
+/** 单张图片的等比缩放结果详情。 */
+export interface ResizeDetail {
+  /** 图片文件路径 */
+  path: string;
+  /** 原始宽度 */
+  original_width: number;
+  /** 原始高度 */
+  original_height: number;
+  /** 缩放后宽度（skipped 时为 null） */
+  new_width: number | null;
+  /** 缩放后高度（skipped 时为 null） */
+  new_height: number | null;
+  /** 操作结果："resized" | "skipped" | "failed" */
+  action: string;
+  /** 失败原因（仅 action="failed" 时有值） */
+  error: string | null;
+}
+
+/** 图片等比缩放任务的整体结果。 */
+export interface ResizeResult {
+  /** 扫描的图片总数 */
+  total: number;
+  /** 实际执行缩放的图片数 */
+  resized: number;
+  /** 跳过的图片数（已在限制内） */
+  skipped: number;
+  /** 处理失败的图片数 */
+  failed: number;
+  /** 每张图片的详细结果 */
+  details: ResizeDetail[];
+}
