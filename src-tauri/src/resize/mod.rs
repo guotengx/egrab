@@ -112,6 +112,15 @@ fn process_single_image(
     );
 
     if scale >= 1.0 {
+        let relative = path
+            .strip_prefix(base_dir)
+            .map_err(|e| format!("strip prefix: {}", e))?;
+        let output_path = output_base.join(relative);
+        if let Some(parent) = output_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("create dir: {}", e))?;
+        }
+        std::fs::copy(path, &output_path).map_err(|e| format!("Failed to copy: {}", e))?;
+
         return Ok(ResizeDetail {
             path: path.to_string_lossy().to_string(),
             original_width: w,

@@ -423,23 +423,40 @@ impl super::PlatformParser for JdParser {
                 }
                 debug.urlsAfterZb = urls.length;
 
-                // Strategy 2: Parse <style> tags directly (RELIABLE - no layout dependency)
-                // JD injects ssd-module backgrounds via CSS rules in <style> tags.
+                // Strategy 2: Parse <style> tags inside detail containers
+                // JD detail sections use multiple containers: detail-main, detail-top,
+                // detail-header, detail-footer, related-layout-head, related-layout-footer.
+                // Scan ALL <style> elements, but only keep those whose ancestor has an
+                // ID matching /^(detail-|related-layout-)/ to exclude global page CSS.
+                var allStyleNodes = document.querySelectorAll('style');
+                debug.allStyleCount = allStyleNodes.length;
+                var styleNodes = [];
+                for (var s = 0; s < allStyleNodes.length; s++) {
+                    var node = allStyleNodes[s];
+                    var parent = node.parentElement;
+                    var ok = false;
+                    while (parent) {
+                        var pid = parent.id || '';
+                        if (pid.indexOf('detail-') === 0 || pid.indexOf('related-layout-') === 0) {
+                            ok = true;
+                            break;
+                        }
+                        parent = parent.parentElement;
+                    }
+                    if (ok) styleNodes.push(node);
+                }
+                debug.detailStyleCount = styleNodes.length;
+
+                // Collect styleText for debug
                 var styleText = '';
-                var styleNodes = document.querySelectorAll('style');
-                debug.styleCount = styleNodes.length;
                 for (var i = 0; i < styleNodes.length; i++) {
                     styleText += '\n' + (styleNodes[i].textContent || '');
                 }
                 debug.styleTextLength = styleText.length;
-
-                // Check if styleText contains ssd-module patterns
                 debug.hasSsdModule = styleText.indexOf('ssd-module') !== -1;
                 debug.hasBackgroundImage = styleText.indexOf('background-image') !== -1;
 
-                // Extract all background-image URLs from style text
-                // Use simple string search instead of complex regex
-                var styleNodes = document.querySelectorAll('style');
+                // Extract all background-image URLs from detail-container <style> tags
                 for (var i = 0; i < styleNodes.length; i++) {
                     var text = styleNodes[i].textContent || '';
                     var searchStr = 'background-image:url(';
