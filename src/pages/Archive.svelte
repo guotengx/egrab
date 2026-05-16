@@ -257,6 +257,40 @@
                 <TaskCard {task} onDelete={handleDeleteTask} />
               </div>
 
+              <!-- Always-visible action bar below each TaskCard -->
+              {#if task.folder_path && task.status === 'success'}
+                <div class="flex items-center justify-end gap-3 mt-1 px-1">
+                  <button
+                    type="button"
+                    onclick={() => handleOpenFolder(task.folder_path ?? undefined)}
+                    class="text-mute hover:text-on-dark transition-colors cursor-pointer bg-transparent border-none text-[12px] p-0 underline"
+                  >
+                    打开文件夹
+                  </button>
+                  <button
+                    type="button"
+                    onclick={() => handleResizeImages(task.id)}
+                    class="text-mute hover:text-on-dark transition-colors cursor-pointer bg-transparent border border-hairline rounded px-2 py-0.5 text-[12px] disabled:opacity-40"
+                    disabled={resizeLoading}
+                  >
+                    {resizeLoading ? '缩放中...' : '等比缩放'}
+                  </button>
+                </div>
+                {#if resizeResult}
+                  <p class="text-mute text-[11px] px-1 mt-0.5">
+                    缩放完成：共 {resizeResult.total} 张，
+                    已缩放 {resizeResult.resized} 张，
+                    已跳过 {resizeResult.skipped} 张
+                    {#if resizeResult.failed > 0}
+                      ，失败 {resizeResult.failed} 张
+                    {/if}
+                  </p>
+                {/if}
+                {#if resizeError}
+                  <p class="text-accent-red text-[11px] px-1">{resizeError}</p>
+                {/if}
+              {/if}
+
               <!-- Inline Detail Panel (expanded below card) -->
               {#if selectedTaskId === task.id && taskDetail}
                 {@const product = taskDetail.product}
@@ -321,43 +355,16 @@
                   <!-- Meta Info -->
                   <div class="pt-2 border-t border-hairline flex items-center justify-between">
                     <span class="text-stone text-xs">抓取时间: {formatTime(task.created_at)}</span>
-                    <div class="flex items-center gap-3">
-                      {#if task.folder_path}
-                        <button
-                          type="button"
-                          onclick={() => handleOpenFolder(task.folder_path ?? undefined)}
-                          class="text-mute hover:text-on-dark transition-colors cursor-pointer bg-transparent border-none text-xs p-0 underline"
-                        >
-                          打开文件夹
-                        </button>
-                        <button
-                          type="button"
-                          onclick={() => handleResizeImages(task.id)}
-                          class="text-mute hover:text-on-dark transition-colors cursor-pointer bg-transparent border-none text-xs p-0 underline"
-                        >
-                          等比缩放
-                        </button>
-                      {/if}
-                    </div>
+                    {#if task.folder_path}
+                      <button
+                        type="button"
+                        onclick={() => handleOpenFolder(task.folder_path ?? undefined)}
+                        class="text-mute hover:text-on-dark transition-colors cursor-pointer bg-transparent border-none text-xs p-0 underline"
+                      >
+                        打开文件夹
+                      </button>
+                    {/if}
                   </div>
-
-                  <!-- Resize Result Feedback -->
-                  {#if resizeLoading}
-                    <p class="text-mute text-xs pt-2">缩放中...</p>
-                  {/if}
-                  {#if resizeResult}
-                    <p class="text-mute text-xs pt-2">
-                      缩放完成：共 {resizeResult.total} 张，
-                      已缩放 {resizeResult.resized} 张，
-                      已跳过 {resizeResult.skipped} 张
-                      {#if resizeResult.failed > 0}
-                        ，失败 {resizeResult.failed} 张
-                      {/if}
-                    </p>
-                  {/if}
-                  {#if resizeError}
-                    <p class="text-accent-red text-xs pt-2">{resizeError}</p>
-                  {/if}
                 </div>
               {/if}
             </div>
