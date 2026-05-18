@@ -481,6 +481,28 @@ impl super::PlatformParser for JdParser {
                 }
                 debug.urlsAfterStyle = urls.length;
 
+                // Strategy 2.5: Extract <img> tags from detail containers
+                // Many JD products (books, tea, phones, etc.) have detail images as direct <img> tags,
+                // e.g., <img class="shop-editor-floor" src="..."> or <p><img src="..."></p>.
+                var detailIds = ['detail-main', 'detail-top', 'related-layout-head', 'related-layout-footer'];
+                for (var d = 0; d < detailIds.length; d++) {
+                    var container = document.getElementById(detailIds[d]);
+                    if (!container) continue;
+                    var imgs = container.querySelectorAll('img');
+                    debug['imgCount_' + detailIds[d]] = imgs.length;
+                    for (var j = 0; j < imgs.length; j++) {
+                        var src = imgs[j].getAttribute('src') || '';
+                        if (!src || src.indexOf('data:') === 0) continue;
+                        var isJdCdn = src.indexOf('360buyimg.com') !== -1 || src.indexOf('jd.com') !== -1;
+                        var isImageExt = /\.(jpg|jpeg|png|avif|webp|bmp|gif)($|\?|#)/i.test(src);
+                        var isNotUtility = src.indexOf('/icon') === -1 && src.indexOf('/tool') === -1 && src.indexOf('/sprite') === -1;
+                        if (isJdCdn && isImageExt && isNotUtility) {
+                            push(toAbs(src));
+                        }
+                    }
+                }
+                debug.urlsAfterImg = urls.length;
+
                 // Strategy 3: getComputedStyle() as backup
                 if (urls.length === 0) {
                     var modules = document.querySelectorAll('.ssd-module-wrap .ssd-module, div.ssd-module[data-id]');
