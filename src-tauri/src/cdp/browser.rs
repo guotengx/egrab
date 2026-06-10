@@ -222,18 +222,24 @@ pub fn launch_browser_with_cdp(browser: &BrowserInfo, port: u16) -> Result<(), I
 
     #[cfg(target_os = "windows")]
     {
-        Command::new(&browser.path)
-            .arg(format!("--remote-debugging-port={}", port))
+        let mut cmd = Command::new(&browser.path);
+        cmd.arg(format!("--remote-debugging-port={}", port))
             .arg("--remote-allow-origins=*")
             .arg(format!("--user-data-dir={}", profile_dir))
-            .spawn()
-            .map_err(|e| IpcError {
-                code: ErrorCode::CdpLaunchTimeout,
-                message: format!("Failed to launch {}: {}", browser.name, e),
-                recoverable: true,
-                step: None,
-                details: None,
-            })?;
+            .arg("--no-first-run")
+            .arg("--no-default-browser-check");
+        // Edge on Windows sometimes stays hidden with a custom profile;
+        // force a visible window.
+        if browser.name.contains("Edge") {
+            cmd.arg("--new-window");
+        }
+        cmd.spawn().map_err(|e| IpcError {
+            code: ErrorCode::CdpLaunchTimeout,
+            message: format!("Failed to launch {}: {}", browser.name, e),
+            recoverable: true,
+            step: None,
+            details: None,
+        })?;
     }
 
     Ok(())
