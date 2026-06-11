@@ -125,29 +125,33 @@ pub fn kill_browser_process(browser: &BrowserInfo) {
             "Brave" => "brave.exe",
             other => other,
         };
-        let result = std::process::Command::new("taskkill")
-            .args(["/F", "/IM", image_name])
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status();
-        match result {
-            Ok(status) if status.success() => {
-                tracing::info!(image = image_name, "Killed existing browser process");
+
+        // Force-kill browser processes (Edge Startup Boost keeps hidden
+        // msedge.exe alive even after the user closes all windows, so a
+        // single pass may not suffice).
+        for pass in 0..3 {
+            let result = std::process::Command::new("taskkill")
+                .args(["/F", "/IM", image_name])
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .status();
+            match result {
+                Ok(status) if status.success() => {
+                    tracing::info!(image = image_name, pass, "Killed browser processes");
+                }
+                Ok(_) => {
+                    if pass == 0 {
+                        tracing::info!(image = image_name, "No browser processes to kill");
+                    }
+                    break; // no more processes
+                }
+                Err(e) => {
+                    tracing::warn!(image = image_name, error = %e, "taskkill failed");
+                    break;
+                }
             }
-            Ok(status) => {
-                tracing::warn!(
-                    image = image_name,
-                    exit_code = ?status.code(),
-                    "taskkill returned non-zero (process may not be running — non-fatal)"
-                );
-            }
-            Err(e) => {
-                tracing::warn!(
-                    image = image_name,
-                    error = %e,
-                    "taskkill command failed — non-fatal"
-                );
-            }
+            // Wait for OS to fully reap processes before retrying / relaunching.
+            std::thread::sleep(std::time::Duration::from_secs(2));
         }
     }
 }
@@ -227,11 +231,13 @@ pub fn launch_browser_with_cdp(browser: &BrowserInfo, port: u16) -> Result<(), I
             .arg("--remote-allow-origins=*")
             .arg(format!("--user-data-dir={}", profile_dir))
             .arg("--no-first-run")
-            .arg("--no-default-browser-check");
-        // Edge on Windows sometimes stays hidden with a custom profile;
-        // force a visible window.
+            .arg("--no-default-browser-check")
+            .arg("--disable-background-mode");
+        // Edge has an aggressive Startup Boost that keeps background processes
+        // alive even after taskkill. Disable it and force a visible window.
         if browser.name.contains("Edge") {
             cmd.arg("--new-window");
+            cmd.arg("--disable-features=msEdgeStartupBoost,msEdgeSidebar");
         }
         cmd.spawn().map_err(|e| IpcError {
             code: ErrorCode::CdpLaunchTimeout,
