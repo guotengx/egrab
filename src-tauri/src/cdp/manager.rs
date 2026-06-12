@@ -185,7 +185,14 @@ impl CdpManager {
             "Selected browser for CDP launch"
         );
 
-        // 3. Launch the browser with CDP flags and an independent persistent profile.
+        // 3. For Edge on Windows, kill any lingering processes before launching.
+        //    Edge's Startup Boost keeps msedge.exe alive even after the user
+        //    closes all windows, and this can silently block CDP port binding.
+        if chosen.name.contains("Edge") {
+            browser::kill_browser_process(&chosen);
+        }
+
+        // 4. Launch the browser with CDP flags and an independent persistent profile.
         //    Using --user-data-dir avoids Chrome's single-instance lock — the user's
         //    existing browser sessions are unaffected. Login state within EGrab's
         //    profile is preserved across sessions.
