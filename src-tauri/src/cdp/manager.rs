@@ -190,6 +190,8 @@ impl CdpManager {
         //    closes all windows, and this can silently block CDP port binding.
         if chosen.name.contains("Edge") {
             browser::kill_browser_process(&chosen);
+            // Give Edge a moment to fully stop before relaunching.
+            std::thread::sleep(std::time::Duration::from_secs(1));
         }
 
         // 4. Launch the browser with CDP flags and an independent persistent profile.

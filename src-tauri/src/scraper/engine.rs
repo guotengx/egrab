@@ -224,9 +224,10 @@ impl ScraperEngine {
         // JS does NOT actually wait. Must use Rust-side sleep + synchronous JS checks.
         let wait_check_js = r#"
             (function() {
-                var hasTitle = document.querySelector('.sku-name, .itemInfo-wrap .sku-name, [class*="sku-name"]');
+                var hasTaobao = document.querySelector('.sku-name, .itemInfo-wrap .sku-name, #J_DetailMeta, .tb-title');
+                var hasJD = document.querySelector('#spec-n1 img, #detail-main, #detail-top, ._scoped_1nhp8_1, .sku-title-name');
                 var hasImages = document.querySelector('#spec-list img, .J-p-img img, #spec-n1 img');
-                return !!(hasTitle || hasImages);
+                return !!(hasTaobao || hasJD || hasImages);
             })()
         "#;
         let max_wait_ms: u32 = 6000;

@@ -226,17 +226,11 @@ pub fn launch_browser_with_cdp(browser: &BrowserInfo, port: u16) -> Result<(), I
 
     #[cfg(target_os = "windows")]
     {
-        let mut cmd = Command::new(&browser.path);
         cmd.arg(format!("--remote-debugging-port={}", port))
             .arg("--remote-allow-origins=*")
             .arg(format!("--user-data-dir={}", profile_dir))
             .arg("--no-first-run")
             .arg("--no-default-browser-check");
-        // Edge needs an explicit --new-window to ensure a visible tab opens
-        // when launched via CDP (otherwise it may stay hidden).
-        if browser.name.contains("Edge") {
-            cmd.arg("--new-window");
-        }
         cmd.spawn().map_err(|e| IpcError {
             code: ErrorCode::CdpLaunchTimeout,
             message: format!("Failed to launch {}: {}", browser.name, e),
