@@ -249,6 +249,46 @@ impl ScraperEngine {
         // Uses synchronous JS + Rust-side tokio::time::sleep for timing —
         // chromiumoxide's evaluate() defaults to awaitPromise:false so Promise-based
         // scroll JS would return immediately without actually completing.
+        //
+        // JD detail containers use fixed height + overflow:hidden + transform:scale,
+        // which prevents window.scrollTo from reaching the actual image elements.
+        // Force-expand them before scrolling.
+        let _ = cdp.evaluate(r#"
+            (function() {
+                var ids = ['detail-main','detail-top','related-layout-head','related-layout-footer'];
+                for (var i = 0; i < ids.length; i++) {
+                    var el = document.getElementById(ids[i]);
+                    if (el) {
+                        el.style.height = 'auto';
+                        el.style.overflow = 'visible';
+                        el.style.maxHeight = 'none';
+                    }
+                }
+                var scoped = document.querySelector('._scoped_1nhp8_1');
+                if (scoped) {
+                    scoped.querySelectorAll('*').forEach(function(c) {
+                        var s = c.style;
+                        if (s.overflow === 'hidden') s.overflow = 'visible';
+                        var h = s.height || s.maxHeight;
+                        if (h && h !== 'auto') {
+                            s.height = 'auto';
+                            s.maxHeight = 'none';
+                        }
+                    });
+                }
+                // Set all images in detail containers to eager loading.
+                var containers = document.querySelectorAll(
+                    '#detail-main, #detail-top, #related-layout-head, ._scoped_1nhp8_1'
+                );
+                containers.forEach(function(ct) {
+                    ct.querySelectorAll('img').forEach(function(img) {
+                        img.loading = 'eager';
+                        img.decoding = 'sync';
+                    });
+                });
+                return 'expanded';
+            })()
+        "#).await;
         let height_result = cdp.evaluate("document.body.scrollHeight")
             .await
             .ok()
