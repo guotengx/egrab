@@ -226,6 +226,7 @@ pub fn launch_browser_with_cdp(browser: &BrowserInfo, port: u16) -> Result<(), I
 
     #[cfg(target_os = "windows")]
     {
+        let mut cmd = Command::new(&browser.path);
         cmd.arg(format!("--remote-debugging-port={}", port))
             .arg("--remote-allow-origins=*")
             .arg(format!("--user-data-dir={}", profile_dir))
