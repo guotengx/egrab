@@ -1,9 +1,14 @@
 // EGrab - Parser Module
-// Platform-specific page parser definitions and registry.
+// 平台解析器注册表。
+//
+// 自 v2 起，所有平台解析逻辑均由 **外置规则包** 驱动
+// （见 src-tauri/rules/ 与运行时的 <app_data>/com.egrab.app/rules/），
+// 不再有任何平台专属的 Rust 代码。平台改版时只需修改规则文件，
+// 无需重新编译或重装程序。
+//
 // Derived from: src/protocols/parser.ts, ARCHITECTURE 4.3
 
-pub mod jd;
-pub mod taobao;
+pub mod rules;
 pub mod utils;
 
 use crate::models::{ProductData, ScrapeErrorInfo};
@@ -57,12 +62,13 @@ pub trait PlatformParser: Send + Sync {
     async fn parse(&self, page: &dyn PageHandle) -> anyhow::Result<ParseResult>;
 }
 
-/// Returns all platform parsers registered in the system.
+/// Returns all platform parsers defined by the currently active rule pack.
 pub fn all_parsers() -> Vec<Box<dyn PlatformParser>> {
-    vec![
-        Box::new(taobao::TaobaoParser::new()),
-        Box::new(jd::JdParser::new()),
-    ]
+    let (pack, _source) = rules::load_rule_pack();
+    pack.platforms
+        .into_iter()
+        .map(|rule| Box::new(rules::RuleParser::new(rule)) as Box<dyn PlatformParser>)
+        .collect()
 }
 
 /// Finds the first parser that can handle the given URL.

@@ -1,0 +1,44 @@
+{
+  "version": 2,
+  "updated_at": "2026-08-29",
+  "note": "EGrab 抓取规则包。修改本目录下的文件后保存，下一次抓取立即生效，无需重新编译或重装程序。",
+  "platforms": [
+    {
+      "id": "taobao",
+      "label": "淘宝 / 天猫",
+      "match_url": [
+        "item.taobao.com",
+        "detail.tmall.com",
+        "chaoshi.detail.tmall.com",
+        "detail.tmall.hk",
+        "item.tmall.com",
+        "world.taobao.com"
+      ],
+      "item_id": [
+        { "kind": "query", "key": "id" },
+        { "kind": "digit_run", "min_len": 8 }
+      ],
+      "base_domain": "item.taobao.com",
+      "image_cleaner": "taobao",
+      "wait_js": "(function(){ try { if (window.__ICE_APP_CONTEXT__ && window.__ICE_APP_CONTEXT__.loaderData) return true; } catch(e){} return !!document.querySelector('[class*=\"mainPic\"], [class*=\"PicGallery\"], #J_ImgBooth, .tb-main-title, [class*=\"ItemHeader\"]'); })()",
+      "expand_js_file": "taobao.expand.js",
+      "extract_js_file": "taobao.extract.js",
+      "scroll": { "step": 600, "delay_ms": 300, "settle_ms": 1500, "max_height": 40000 }
+    },
+    {
+      "id": "jd",
+      "label": "京东",
+      "match_url": ["item.jd.com", "item.m.jd.com"],
+      "item_id": [
+        { "kind": "path_digits" },
+        { "kind": "digit_run", "min_len": 5 }
+      ],
+      "base_domain": "item.jd.com",
+      "image_cleaner": "jd",
+      "wait_js": "(function(){ return !!document.querySelector('#detail-main, #detail-top, [class*=\"scoped\"], .sku-name, [class*=\"sku-title-name\"], [class*=\"gallery\"] img, #spec-n1 img'); })()",
+      "expand_js_file": "jd.expand.js",
+      "extract_js_file": "jd.extract.js",
+      "scroll": { "step": 500, "delay_ms": 300, "settle_ms": 1500, "max_height": 60000 }
+    }
+  ]
+}

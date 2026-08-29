@@ -4,5 +4,6 @@
 pub mod cdp_commands;
 pub mod config_commands;
 pub mod resize_commands;
+pub mod rules_commands;
 pub mod scrape_commands;
 pub mod task_commands;

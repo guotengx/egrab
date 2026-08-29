@@ -233,3 +233,81 @@ export async function resizeImages(taskId: string): Promise<ResizeResult> {
     throw toIpcError(err);
   }
 }
+
+// ---------------------------------------------------------------------------
+// 抓取规则包 / 页面诊断快照
+//
+// 平台改版时，规则文件可直接在磁盘上编辑，保存后下一次抓取即生效，
+// 无需重新编译或重装程序。
+// ---------------------------------------------------------------------------
+
+/** 单个平台的规则摘要。 */
+export interface RulePlatformInfo {
+  id: string;
+  label: string;
+  match_url: string[];
+  extract_js_file: string | null;
+  expand_js_file: string | null;
+  has_extract_js: boolean;
+}
+
+/** 当前生效的规则包信息。 */
+export interface RulesInfo {
+  source: 'disk' | 'embedded';
+  path: string;
+  rules_dir: string;
+  snapshots_dir: string;
+  version: number;
+  updated_at: string;
+  error: string | null;
+  platforms: RulePlatformInfo[];
+}
+
+/**
+ * 查询当前生效的抓取规则包。
+ * IPC command: `get_rules_info`
+ */
+export async function getRulesInfo(): Promise<RulesInfo> {
+  try {
+    return await invoke<RulesInfo>('get_rules_info');
+  } catch (err) {
+    throw toIpcError(err);
+  }
+}
+
+/**
+ * 校验磁盘上的规则文件是否合法（规则每次抓取都会重新读取，本命令用于提前发现语法错误）。
+ * IPC command: `reload_rules`
+ */
+export async function reloadRules(): Promise<RulesInfo> {
+  try {
+    return await invoke<RulesInfo>('reload_rules');
+  } catch (err) {
+    throw toIpcError(err);
+  }
+}
+
+/**
+ * 打开规则目录，供用户直接编辑规则文件。
+ * IPC command: `open_rules_folder`
+ */
+export async function openRulesFolder(): Promise<boolean> {
+  try {
+    return await invoke<boolean>('open_rules_folder');
+  } catch (err) {
+    throw toIpcError(err);
+  }
+}
+
+/**
+ * 导出当前浏览器页面的诊断快照（DOM + 候选全局变量 + 图片清单）。
+ * 返回生成的 JSON 快照文件路径。
+ * IPC command: `dump_page_snapshot`
+ */
+export async function dumpPageSnapshot(): Promise<string> {
+  try {
+    return await invoke<string>('dump_page_snapshot');
+  } catch (err) {
+    throw toIpcError(err);
+  }
+}

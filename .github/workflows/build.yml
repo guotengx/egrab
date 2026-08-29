@@ -10,9 +10,18 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ===== macOS aarch64 + x86_64 =====
+  # ===== macOS: aarch64 (Apple Silicon) + x86_64 (Intel) =====
   build-macos:
+    name: macOS ${{ matrix.arch }}
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: aarch64
+            target: aarch64-apple-darwin
+          - arch: x86_64
+            target: x86_64-apple-darwin
     steps:
       - uses: actions/checkout@v4
 
@@ -23,40 +32,62 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry & target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('src-tauri/Cargo.toml') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.target }}-cargo-
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build Tauri (aarch64)
-        run: npm run tauri build -- --target aarch64-apple-darwin
+      - name: Build Tauri (${{ matrix.target }})
+        run: npm run tauri build -- --target ${{ matrix.target }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Collect aarch64 DMG
+      - name: Collect DMG
         run: |
           mkdir -p dist-artifacts
-          cp src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg dist-artifacts/
+          for f in src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg; do
+            [ -e "$f" ] || continue
+            base=$(basename "$f" .dmg)
+            cp "$f" "dist-artifacts/${base}_${{ matrix.arch }}.dmg"
+          done
+          ls -lh dist-artifacts
 
-      - name: Build Tauri (x86_64)
-        run: npm run tauri build -- --target x86_64-apple-darwin
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Collect x86_64 DMG
-        run: |
-          mkdir -p dist-artifacts
-          cp src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg dist-artifacts/
-
-      - name: Upload DMGs
+      - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
-          name: EGrab-macOS
+          name: EGrab-macOS-${{ matrix.arch }}
           path: dist-artifacts/*.dmg
+          if-no-files-found: error
 
-  # ===== Windows x86_64 =====
+  # ===== Windows: x86_64 + aarch64 (ARM64) =====
   build-windows:
+    name: Windows ${{ matrix.arch }}
     runs-on: windows-latest
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            target: x86_64-pc-windows-msvc
+            bundles: msi,nsis
+            experimental: false
+          - arch: arm64
+            target: aarch64-pc-windows-msvc
+            # WiX/MSI 在 ARM64 上支持不稳定，统一用 NSIS 安装包（.exe），
+            # 在 ARM64 Windows 上原生运行，也可在 x64 上通过模拟层安装。
+            bundles: nsis
+            experimental: true
     steps:
       - uses: actions/checkout@v4
 
@@ -67,46 +98,68 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: x86_64-pc-windows-msvc
+          targets: ${{ matrix.target }}
 
-      - name: Install WebView2
-        run: |
-          # WebView2 is pre-installed on windows-latest runner
-          echo "WebView2 is available"
+      - name: Cache cargo registry & target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('src-tauri/Cargo.toml') }}
+          restore-keys: ${{ runner.os }}-${{ matrix.target }}-cargo-
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build Tauri
-        run: npm run tauri build
+      - name: Build Tauri (${{ matrix.target }})
+        run: npm run tauri build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload MSI
+      - name: Collect installers
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist-artifacts | Out-Null
+          $roots = @(
+            "src-tauri/target/${{ matrix.target }}/release/bundle/msi",
+            "src-tauri/target/${{ matrix.target }}/release/bundle/nsis"
+          )
+          foreach ($root in $roots) {
+            if (Test-Path $root) {
+              Get-ChildItem -Path $root -Include *.msi,*.exe -Recurse | ForEach-Object {
+                $newName = "$($_.BaseName)_${{ matrix.arch }}$($_.Extension)"
+                Copy-Item $_.FullName -Destination "dist-artifacts/$newName"
+              }
+            }
+          }
+          Get-ChildItem dist-artifacts
+
+      - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
-          name: EGrab-Windows-x64
-          path: src-tauri/target/release/bundle/msi/*.msi
+          name: EGrab-Windows-${{ matrix.arch }}
+          path: dist-artifacts/*
+          if-no-files-found: error
 
-  # ===== Release: create GitHub Release for tag pushes =====
+  # ===== Release: 打 v* 标签时自动发布，附加全部平台/架构安装包 =====
   release:
     needs: [build-macos, build-windows]
-    if: startsWith(github.ref, 'refs/tags/v')
+    # 即使某个实验性架构（Windows ARM64）构建失败，也照常发布已成功的产物。
+    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.build-macos.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Download macOS artifact
+      - name: Download all build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: EGrab-macOS
-          path: artifacts/macos
+          path: artifacts
+          merge-multiple: true
 
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: EGrab-Windows-x64
-          path: artifacts/windows
+      - name: List artifacts
+        run: ls -lhR artifacts
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -114,7 +167,8 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
           files: |
-            artifacts/macos/*.dmg
-            artifacts/windows/*.msi
+            artifacts/*.dmg
+            artifacts/*.msi
+            artifacts/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

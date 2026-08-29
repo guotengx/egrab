@@ -35,6 +35,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
+            // 释放/升级外置抓取规则包到磁盘。
+            // 规则文件可由用户直接编辑，平台改版时无需重新编译或重装。
+            let rules_status = parser::rules::ensure_rules_on_disk();
+            tracing::info!(status = %rules_status, "Rule pack ready");
+
             // Initialize and inject managed state: AppConfigManager
             let config_manager = config::AppConfigManager::new();
             let storage_root = config_manager.get_config().storage_root;
@@ -86,6 +91,10 @@ pub fn run() {
             commands::task_commands::open_folder,
             commands::task_commands::get_cover_image,
             commands::resize_commands::resize_images,
+            commands::rules_commands::get_rules_info,
+            commands::rules_commands::reload_rules,
+            commands::rules_commands::open_rules_folder,
+            commands::rules_commands::dump_page_snapshot,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

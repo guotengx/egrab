@@ -219,22 +219,33 @@ impl ScraperEngine {
         }
         tracing::info!(task_id = %task_id, "CDP navigation succeeded");
 
+        // 页面就绪判定、详情区展开、滚动参数全部来自外置规则包，
+        // 平台改版时改规则文件即可，无需重新编译。
+        let rule = parser::rules::find_rule(&url);
+        if let Some(ref r) = rule {
+            tracing::info!(platform = %r.id, "Loaded platform rule from rule pack");
+        } else {
+            tracing::warn!(url = %url, "No platform rule matched; using generic defaults");
+        }
+
         // Wait for JS rendering: poll every 300ms up to 6 seconds.
         // chromiumoxide's evaluate() defaults to awaitPromise:false, so Promise-based
         // JS does NOT actually wait. Must use Rust-side sleep + synchronous JS checks.
-        let wait_check_js = r#"
+        const FALLBACK_WAIT_JS: &str = r#"
             (function() {
-                var hasTaobao = document.querySelector('.sku-name, .itemInfo-wrap .sku-name, #J_DetailMeta, .tb-title');
-                var hasJD = document.querySelector('#spec-n1 img, #detail-main, #detail-top, ._scoped_1nhp8_1, .sku-title-name');
-                var hasImages = document.querySelector('#spec-list img, .J-p-img img, #spec-n1 img');
-                return !!(hasTaobao || hasJD || hasImages);
+                return !!document.querySelector('img');
             })()
         "#;
+        let wait_check_js: String = rule
+            .as_ref()
+            .and_then(|r| r.wait_js.clone())
+            .unwrap_or_else(|| FALLBACK_WAIT_JS.to_string());
+
         let max_wait_ms: u32 = 6000;
         let poll_interval_ms: u64 = 300;
         let mut waited: u32 = 0;
         loop {
-            match cdp.evaluate(wait_check_js).await {
+            match cdp.evaluate(&wait_check_js).await {
                 Ok(v) if v.as_bool() == Some(true) => break,
                 _ => {}
             }
@@ -250,54 +261,29 @@ impl ScraperEngine {
         // chromiumoxide's evaluate() defaults to awaitPromise:false so Promise-based
         // scroll JS would return immediately without actually completing.
         //
-        // JD detail containers use fixed height + overflow:hidden + transform:scale,
+        // Detail containers often use fixed height + overflow:hidden + transform:scale,
         // which prevents window.scrollTo from reaching the actual image elements.
-        // Force-expand them before scrolling.
-        let _ = cdp.evaluate(r#"
-            (function() {
-                var ids = ['detail-main','detail-top','related-layout-head','related-layout-footer'];
-                for (var i = 0; i < ids.length; i++) {
-                    var el = document.getElementById(ids[i]);
-                    if (el) {
-                        el.style.height = 'auto';
-                        el.style.overflow = 'visible';
-                        el.style.maxHeight = 'none';
-                    }
-                }
-                var scoped = document.querySelector('._scoped_1nhp8_1');
-                if (scoped) {
-                    scoped.querySelectorAll('*').forEach(function(c) {
-                        var s = c.style;
-                        if (s.overflow === 'hidden') s.overflow = 'visible';
-                        var h = s.height || s.maxHeight;
-                        if (h && h !== 'auto') {
-                            s.height = 'auto';
-                            s.maxHeight = 'none';
-                        }
-                    });
-                }
-                // Set all images in detail containers to eager loading.
-                var containers = document.querySelectorAll(
-                    '#detail-main, #detail-top, #related-layout-head, ._scoped_1nhp8_1'
-                );
-                containers.forEach(function(ct) {
-                    ct.querySelectorAll('img').forEach(function(img) {
-                        img.loading = 'eager';
-                        img.decoding = 'sync';
-                    });
-                });
-                return 'expanded';
-            })()
-        "#).await;
-        let height_result = cdp.evaluate("document.body.scrollHeight")
+        // The per-platform expand script force-expands them before scrolling.
+        if let Some(expand_js) = rule.as_ref().and_then(|r| r.expand_js.clone()) {
+            match cdp.evaluate(&expand_js).await {
+                Ok(v) => tracing::info!(result = ?v, "Expand script executed"),
+                Err(e) => tracing::warn!(error = %e.message, "Expand script failed (non-fatal)"),
+            }
+        }
+
+        let scroll = rule.as_ref().map(|r| r.scroll.clone()).unwrap_or_default();
+
+        let page_height = cdp
+            .evaluate("document.body.scrollHeight")
             .await
             .ok()
             .and_then(|v| v.as_f64())
             .unwrap_or(5000.0) as u32;
+        // 上限保护：极端长页面不至于把抓取时间拖到无法接受。
+        let height_result = page_height.min(scroll.max_height);
 
-        let step: u32 = 500;
+        let step: u32 = if scroll.step == 0 { 500 } else { scroll.step };
         let mut current: u32 = 0;
-        let scroll_delay_ms: u64 = 300;
 
         while current < height_result {
             current = (current + step).min(height_result);
@@ -306,11 +292,11 @@ impl ScraperEngine {
                 current
             );
             let _ = cdp.evaluate(&js).await;
-            tokio::time::sleep(std::time::Duration::from_millis(scroll_delay_ms)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(scroll.delay_ms)).await;
         }
 
-        // Wait 1.5s for lazy-loaded images to appear after scrolling.
-        tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+        // Wait for lazy-loaded images to appear after scrolling.
+        tokio::time::sleep(std::time::Duration::from_millis(scroll.settle_ms)).await;
 
         // Scroll back to top.
         let _ = cdp.evaluate("window.scrollTo(0, 0)").await;
