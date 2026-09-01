@@ -58,10 +58,10 @@
 
   // 商品图判定（比 isJdImage 更严格，用于主图和详情图）。
   //
-  // 京东的商品图一律存放在 jfs/ 路径下；而页面上的图标、活动横幅、
-  // 优惠券、店铺装修图走的是 imgzone / babel / da / cms 等路径。
-  // 只认 jfs/ 能一次性滤掉绝大多数噪声。
-  var NOISE_PATH = /\/(imgzone|imgtools|babel|cms|adver|coupon|da|jdcloud|activity|seckill|promo)\//i;
+  // 京东的商品图一律存放在 jfs/ 路径下；图标、活动横幅、店铺装修图走
+  // imagetools / babel / da / cms 等路径。
+  // 注意：imgzone 也是商品图路径（详情长图实测全在 imgzone/jfs/），不能排除。
+  var NOISE_PATH = /\/(imagetools|babel|cms|adver|coupon|da|jdcloud|activity|seckill|promo)\//i;
   function isJdProductImage(u) {
     if (!isJdImage(u)) return false;
     if (u.indexOf('jfs/') < 0) return false;
@@ -146,10 +146,11 @@
   var detailRoot = document.querySelector('#detail-main, #detail, #detail-top');
 
   // 分层选择器：从最精确到最宽泛，**第一组有产出就停**。
-  // 上一版把所有选择器合并成一条，导致最宽泛的 carousel/preview
-  // 把推荐位和活动图标一起捞进来（实测命中 35 张）。
+  // 2026-09 实测：缩略图条是 .thumbnails .item img.image（类名稳定，不带哈希），
+  // 第一条 item 里额外叠了一个 img.thumbnails-play-icon（imagetools png，需排除）；
+  // 第二条 item 与主图同 URL，靠 jdKey 去重。主图大图是 #spec-img。
   var galleryGroups = [
-    ['#spec-list img', '#spec-n1 img', '#preview img'],
+    ['.thumbnails img.image', '.thumbnails .item img', '#spec-img', '#spec-list img', '#spec-n1 img', '#preview img'],
     ['[class*="gallery"] [class*="thumb"] img', '[class*="Gallery"] [class*="thumb"] img'],
     ['[class*="gallery"] img', '[class*="Gallery"] img'],
     ['[class*="mainImage"] img', '[class*="main-img"] img', '[class*="mainPic"] img'],
@@ -160,6 +161,8 @@
     var nodes = qsa(galleryGroups[gi].join(','));
     if (!nodes.length) continue;
     nodes.forEach(function (im) {
+      if (im.classList && im.classList.contains('thumbnails-play-icon')) return; // 视频播放图标
+      if (im.closest && im.closest('.thumbnails') && im.classList && !im.classList.contains('image')) return;
       if (detailRoot && detailRoot.contains(im)) return; // 详情区的图不算主图
       pushProductImg(out.gallery, seenG, im, imgSrc(im));
     });
@@ -354,9 +357,10 @@
   dbg.afterStyle = out.detail_images.length;
 
   // 策略 3：详情容器内的 <img>
-  // 实测 wrapperCount=11 时会把"猜你喜欢/本店推荐"等楼层一起扫进来，
-  // 因此排除推荐/评价/店铺区，并且只收 jfs/ 商品图。
-  var wrappers = qsa('[class*="scoped"], #detail-main, #detail-top, #detail, [id^="related-layout-"]')
+  // 2026-09 实测：页面有 13 个 [class*="scoped"] 容器（店铺/标题/tab/参数/售后…），
+  // 详情只是其中一个，靠排除区过滤仍会漏进缩略图和图标。
+  // 详情长图实测全在 #detail-main（imgzone/jfs/），直接按容器 ID 精确取。
+  var wrappers = qsa('#detail-main, #detail-top, #detail, [id^="related-layout-"]')
     .filter(function (w) { return !inExcludedZone(w); });
   var imgCount = 0;
   wrappers.forEach(function (w) {
