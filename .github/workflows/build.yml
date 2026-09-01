@@ -78,9 +78,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # x64 只出 MSI：v0.2.0 同时产出 MSI + NSIS 导致两者装到不同目录
+          # （Program Files vs %LOCALAPPDATA%），互相冲突并产生失效快捷方式。
+          # MSI 是 v0.1.x 已长期验证的方案，且装在 Program Files 不易被杀软拦截。
           - arch: x64
             target: x86_64-pc-windows-msvc
-            bundles: msi,nsis
+            bundles: msi
             experimental: false
           - arch: arm64
             target: aarch64-pc-windows-msvc

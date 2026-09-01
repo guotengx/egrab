@@ -1,6 +1,7 @@
 {
   "productName": "EGrab",
-  "version": "0.2.0",
+  "mainBinaryName": "EGrab",
+  "version": "0.2.1",
   "identifier": "com.egrab.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -49,7 +50,13 @@
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
-      "timestampUrl": ""
+      "timestampUrl": "",
+      "nsis": {
+        "installMode": "perMachine",
+        "installerIcon": "icons/icon.ico",
+        "displayLanguageSelector": false,
+        "languages": ["SimpChinese", "English"]
+      }
     }
   }
 }
