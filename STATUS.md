@@ -1,6 +1,7 @@
 # EGrab - 项目状态追踪
 
 > 由 planner 维护，记录当前里程碑进度和任务分配状态。
+> **当前模式**：单 Agent 模式（planner 全能开发者独立完成所有工作）。
 
 ---
 
@@ -22,13 +23,23 @@
 - **Phase 6 测试联调：100% ✅**（P6-1 模型序列化 43/43 ✅，P6-2 存储引擎集成 6/6 ✅，P6-3 抓取引擎 E2E 5/5 ✅，全量 131 tests passed）
 - **Phase 5+6 全面检查验证：100% ✅**（代码质量良好、131 测试全通过、一致性审计通过，Phase 7 可启动）
 - **Phase 7 打包交付：100% ✅**（macOS DMG 5.1MB 构建成功，reviewer 运维审计通过）
+- **Phase 7.1 JD 解析器修复 + 图片等比缩放重构：100% ✅**（JD detail_images 通用过滤 + resize 输出到 proportioned/ + scraper 自动调用 + frontend 按钮文案更新）
+- **Phase 7.2 v0.1.3 本地构建：✅**（macOS ARM64 DMG 10MB ✅，< 15MB 限制）
+- **Phase 7.2 v0.1.3 CI 构建：✅**（macOS aarch64+x86_64 + Windows x86_64）
+- **Phase 7.3 JD 解析器普适性增强 (v0.1.5-v0.1.8)：✅**（域名+后缀通用过滤 → img标签提取 → scoped wrapper 统一扫描）
+- **Phase 7.4 Edge CDP 兼容性修复 (v0.1.9-v0.1.12)：✅**（--new-window → taskkill三连 → auto_connect前杀进程，支持电脑小白用户）
+- **Phase 7.5 Edge 导航与 JD 懒加载修复 (v0.1.13-v0.1.15)：✅**（移除 --new-window 冲突 + Windows 构建修复 + JD 详情容器强制展开）
+- **Phase 8 抓取规则外置引擎 (v0.2.0)：✅**（解析逻辑从二进制剥离到可编辑规则包，平台改版免编译热更新；同步修复 JD 主图 + 天猫价格/规格/SKU）
+- **Phase 8.1 双平台双架构构建矩阵 (v0.2.0)：✅**（macOS aarch64/x86_64 + Windows x64/ARM64，版本号统一对齐 0.2.0）
+- **Phase 8.2 用户实测修复轮 (v0.2.1)：✅**（京东规则 v3/v4 两轮校准 + Windows 安装器修复：x64 只出 MSI / mainBinaryName=EGrab / NSIS perMachine）
+- **CI/CD build+release 合并 (v0.1.5-v0.1.6)：✅**（解决 build/release 竞态，双平台自动发布）
 
 ---
 
 ## 任务状态
 
 | # | 任务 | 负责人 | 状态 | 备注 |
-|---|---|---|---|---|
+|---|---|---|---|---|---|
 | 1 | 项目骨架搭建（Tauri+Svelte） | backend+frontend | ✅ 已完成 | maintainer 已创建工程骨架 |
 | 2 | CDP连接管理模块 | backend | ✅ 已完成 | src-tauri/src/cdp/ 已创建，cdp_connect/cdp_disconnect/cdp_status/cdp_list_tabs 已注册 |
 | 3 | 淘宝商品页解析器 | backend | ✅ 已完成 | src-tauri/src/parser/taobao.rs 已创建，实现 PlatformParser trait |
@@ -40,6 +51,16 @@
 | 9 | 双平台打包测试 | maintainer | ✅ 已完成 | macOS DMG 5.1MB 构建成功，reviewer 审计通过；Windows 构建修复：tauri.conf.json 已添加 icon.ico |
 | 10 | 抓取引擎（scraper） | backend | ✅ 已完成 | src-tauri/src/scraper/engine.rs 实现完整抓取流程：CDP→Parser→Downloader→Storage |
 | 11 | IPC 命令注册 | backend | ✅ 已完成 | start_scrape/cancel_scrape/get_task_history/get_task_detail/open_folder 全部已注册 |
+| 12 | CI/CD build+release合并 | maintainer | ✅ 已完成 | build.yml 合并 release job，v0.1.5-v0.1.6 解决竞态同步 |
+| 13 | JD解析器普适性增强（v0.1.5-v0.1.8） | planner | ✅ 已完成 | 路径白名单→域名+后缀→img标签提取→scoped wrapper 统一扫描 |
+| 14 | Edge CDP兼容性修复（v0.1.9-v0.1.12） | planner | ✅ 已完成 | --new-window + taskkill三连 + auto_connect前杀进程 |
+| 15 | Edge导航+JD懒加载修复（v0.1.13-v0.1.15） | planner | ✅ 已完成 | 移除 --new-window（与 new_page 冲突）+ wait_check_js 加 JD 选择器 + 详情容器强制展开 |
+| 16 | 抓取规则外置引擎（v0.2.0） | planner | ✅ 已完成 | 新增 src-tauri/rules/ + parser/rules.rs；删除 jd.rs(727行)/taobao.rs(558行)；平台改版免编译 |
+| 17 | JD/天猫解析故障修复（v0.2.0） | planner | ✅ 已完成 | JD 抗哈希子串选择器；天猫 price/specs/skus 取值路径修正（真实数据离线回归 8/8 通过） |
+| 18 | 页面诊断快照能力（v0.2.0） | planner | ✅ 已完成 | dump_page_snapshot + raw.json counts 段 + 设置页三按钮 |
+| 19 | 双平台双架构构建矩阵（v0.2.0） | planner | ✅ 已完成 | mac aarch64/x86_64 + win x64/ARM64；ARM64 标 continue-on-error 不阻断发布 |
+| 20 | JD 规则 v3/v4 两轮校准（v0.2.1） | planner | ✅ 已完成 | v3 内容过滤(isJdProductImage/passSizeGate/分层 gallery/SKU 重写)；v4 基于真实 HTML 修 4 bug（imgzone 误杀/imagetools 拼写/scoped 过宽/播放图标）。离线回归 13/13 通过 |
+| 21 | Windows 安装器修复（v0.2.1） | planner | ✅ 已完成 | x64 只出 MSI 消除双包冲突；mainBinaryName=EGrab；NSIS perMachine+installerIcon+中文；版本号对齐 0.2.1 |
 
 ---
 
@@ -79,12 +100,25 @@
 | D-1 | IpcResult<T> 与 Tauri Result<T, IpcError> 语义双轨 | P1 | Phase 5 IPC 联调 | pre/architect | 需明确 IPC 成功返回裸 T，服务层可包装为 IpcResult<T> |
 | D-2 | open_folder 安全策略与 Tauri 2 capabilities 不匹配 | P1 | open_folder 实现前 | backend + maintainer | 需配置 opener 能力，reviewer 审计 |
 | D-3 | force=true 重抓事务语义与 SQLite UNIQUE 约束 | P1 | storage 实现时 | backend + tester | 需验证事务测试 |
-| D-4 | 淘宝/京东解析兜底链路 | P1 | parser 开发前 | backend + qa | 需完成 Spike 2 验证 |
+| D-4 | 淘宝/京东解析兜底链路 | P1 | ~~parser 开发前~~ | planner | ✅ **已由 v0.2.0 规则引擎（TD-009）解决** —— 多来源兜底逻辑下沉到规则脚本（ICE 路由遍历兜底 + DOM 兜底），Spike 2 作废 |
 | D-5 | STATUS.md / TECH_BOARD "done" 表述过早 | P1 | Phase 5 状态更新 | planner + architect | CDP 模块状态需修正为"基础实现完成/真实联调待验证" |
 | D-6 | tailwind.config.js 缺少 ss03 字体特性 | P2 | UI 开发阶段 | frontend/maintainer | 需补齐 Raycast 设计规范 |
 | D-7 | tauri.conf.json CSP 与 bundle targets | P2 | 发布前 | maintainer | 需配置 CSP 和明确 bundle targets |
 | D-8 | src/protocols/README.md 文件清单过时 | P2 | 文档维护 | architect | 需更新协议文件清单 |
 | D-9 | AGENTS.md §5 未要求 reviewer 读取 src/protocols/ | P2 | 文档维护 | pre | 需补充 reviewer 读取要求 |
+
+---
+
+## 当前进行中事项（v0.2.1 发布后，更新于 2026-09-01）
+
+| # | 事项 | 优先级 | 状态 | 说明 |
+|---|------|--------|------|------|
+| C-1 | v0.2.0 CI 首次编译验证 | P0 | ✅ 已完成 | CI 全绿，5 个产物全部构建成功（含实验性 Windows ARM64），Rust 盲写 1053 行一次编译通过，体积全部 <15MB |
+| C-2 | JD 主图/价格选择器校准 | P0 | ✅ 已完成 | 经 v3（盲写过滤）+ v4（真实 HTML 校准）两轮修复，离线回归 13/13 通过；待用户真机最终确认 counts 段 |
+| C-3 | Windows ARM64 构建可行性 | P2 | ✅ 已完成 | 交叉编译 + NSIS 打包成功。附带发现：用户曾把 ARM64 包装到 x64 机器上导致"空白图标+打不开"，属架构选错非杀软问题 |
+| C-4 | 规则包版本升级覆盖用户改动 | P2 | 📋 已文档化 | 内嵌 version 高于磁盘时会备份 `*.bak` 后覆盖。用户如需固定自改规则，须将 `rules.json` 的 `version` 改为大数（如 9999）。已写入 `rules/README.md` |
+| C-5 | 未提交的单 Agent 模式文档迁移 | P2 | 📋 待用户决策 | 工作区存在 AGENTS.md/opencode.json/contract-*.md/src\/protocols/README.md 的模式迁移改动 + 269 个已删除日志证据文件 + AGENTS.md.multi/.single/.bak*、docs/PLANNER_HANDBOOK.md 等未跟踪文件，尚未提交。**注意：v0.2.1 中 STATUS/TECH_BOARD/HISTORY 的文档更新已单独提交，不受此项阻塞** |
+| C-6 | v0.2.1 CI 构建 + 用户真机验证 | P0 | ⏳ 等待 CI/用户 | tag v0.2.1 已推送触发 CI；待用户：①装 v0.2.1 验证快捷方式/图标正常 ②抓京东商品看 raw.json counts 段（预期 gallery=5、detail_images=12、price=87 量级）③卸载 %LOCALAPPDATA%\EGrab 的错架构残留 |
 
 ---
 
@@ -243,6 +277,25 @@ kimi-k2.6（tester）在执行异步任务时，反复出现"成功态不收敛"
 | 2026-05-13 | **Windows CI 构建修复**：tauri.conf.json 中 bundle.icon 缺少 .ico 格式图标，导致 Windows MSI 打包失败（`Couldn't find a .ico icon`）。maintainer 在 icon 数组中添加 `"icons/icon.ico"`。文件已存在于 `src-tauri/icons/icon.ico`，仅需配置引用 | maintainer + planner |
 | 2026-05-13 | **CI 自动 Release**：maintainer 在 build.yml 新增 release job，推送 v* 标签时自动创建 GitHub Release 并附加 macOS DMG + Windows MSI。已推送 v0.1.0 标签触发首次 Release | maintainer + planner |
 | 2026-05-13 | **懒加载滚动修复（detail 目录为空）**：根因是 chromiumoxide `page.evaluate()` 默认 `awaitPromise: false`，导致 JS `new Promise(...)` 的 setInterval/scrollTo 未执行完就被丢弃。改为 Rust 侧 `tokio::time::sleep` 循环 + 同步 JS。修复影响全平台 | backend + planner |
+| 2026-05-18 | **JD 解析器三轮普适性增强（v0.1.5→v0.1.8）**：① 路径白名单→域名+后缀通用过滤；② 新增 `<img src>` 标签提取（书籍/茶叶/iPhone 等不用 CSS 背景图的商品）；③ 从硬编码 ID 列表改为 `_scoped_1nhp8_1` 根容器统一扫描。覆盖京东全部详情图形式 | planner |
+| 2026-05-18 | **CI build+release 合并（v0.1.5→v0.1.6）**：解决旧方案中 build.yml 和 release.yml 竞态导致的 Release 无附件问题。合并后 build 完成才触发 release，v0.1.6 起 5 个 Assets 全部同步 | planner |
+| 2026-06-11 | **Edge CDP 兼容性五轮迭代（v0.1.9→v0.1.12）**：① --new-window 强制弹窗；② taskkill 三连杀（每次间隔 2s 对抗 Startup Boost）；③ 回退 --disable-background-mode / --disable-features（部分 Edge 版本会阻止窗口打开）；④ 最终方案：auto_connect 启动前先 kill_browser_process，确保 Edge 后台进程不会阻止 CDP 端口绑定 | planner |
+| 2026-06-11 | **360 杀毒软件误报**：用户反馈 EGrab 被 360 标记为"银狐木马"。分析为未签名 exe + CDP 浏览器连接 + 网络下载三个行为特征触发的误报。长期方案：购买 Windows Authenticode 代码签名证书 | planner |
+| 2026-06-11 | **GitHub 仓库可见性**：用户决定隐藏仓库。确认免费私有仓库可用，因 gh CLI 需要 OAuth 认证且本地无 token，建议用户通过网页端操作（Settings → Danger Zone → Change visibility） | planner |
+| 2026-06-18 | **Edge 导航修复（v0.1.13）**：`--new-window` 与 CDP `new_page()` 冲突导致 Edge 导航失败，移除该 flag；`wait_check_js` 补充 JD 专属选择器（`#detail-main`/`#detail-top`/`_scoped_1nhp8_1`/`.sku-title-name`），避免 Edge 干等 Taobao-only 元素超时；杀进程后加 1s 冷却 | planner |
+| 2026-06-18 | **Windows 构建修复（v0.1.14）**：cdp 模块缺失 `cmd` 声明导致 Windows 编译失败，补回 | planner |
+| 2026-06-18 | **JD 详情容器强制展开（v0.1.15）**：JD 详情容器用 固定 height + overflow:hidden + transform:scale，导致 `window.scrollTo` 触达不到图片元素。滚动前注入 JS 解除高度/溢出限制并将 img 设为 `loading=eager` | planner |
+| 2026-08-29 | **故障定位（基于用户提供的真实 raw.json）**：① JD `pageConfig.product` 已被平台清空，DOM 兜底的 `._gallery_116km_1` 是构建哈希类名，发版即失效 → GALLERY_EMPTY；② 天猫数据源仍在但取值路径全部错位——价格实际在 `skuCore.sku2info[skuId].price.priceMoney`（分）、规格在 `plusViewVO.industryParamVO.basicParamList`、SKU 在 `skuBase.props`+`skuCore.sku2info`。结论：把易变解析规则编译进二进制是架构错误 | planner |
+| 2026-08-29 | **抓取规则外置引擎落地（v0.2.0，TD-009）**：新增 `src-tauri/rules/`（rules.json + 各平台 extract/expand JS），随二进制 `include_str!` 内嵌并于首次启动释放到 `<app_data>/com.egrab.app/rules/`。磁盘优先、解析失败自动回退内嵌、每次抓取重新读盘、内嵌版本更高时备份 `*.bak` 后升级、脚本文件名做目录穿越校验。新增 `parser/rules.rs` 通用规则驱动解析器，删除 `parser/jd.rs`(727行) 与 `parser/taobao.rs`(558行)，Rust 侧不再含任何平台专属逻辑 | planner |
+| 2026-08-29 | **解析故障修复（v0.2.0）**：天猫 price/specs/skus 三处取值路径修正，用用户提供的真实页面数据构造 fixture 做离线回归，8/8 断言通过（price 168.06~198、specs 7 条、sku price=198 stock=200）；JD 全面改用 `[class*="gallery"]`/`[class*="carousel"]`/`[class*="scoped"]` 子串选择器抵抗构建哈希变化 | planner |
+| 2026-08-29 | **诊断闭环建立（v0.2.0）**：新增 `dump_page_snapshot`（导出完整 DOM + 12 个候选全局变量 + 图片/id/class 清单）、`get_rules_info`、`reload_rules`、`open_rules_folder` 四个 IPC；`raw.json` 新增 `counts` 段；新增 `PRICE_MISSING`/`SPECS_EMPTY`/`EXTRACT_JS_RETURNED_NULL` 降级告警码；设置页新增三个运维按钮 | planner |
+| 2026-08-29 | **双平台双架构构建矩阵（v0.2.0，TD-010）**：macOS aarch64+x86_64（DMG，改 matrix 并行 + 文件名加架构后缀）、Windows x86_64（MSI+NSIS）、Windows aarch64（NSIS，WiX 在 ARM64 不稳定故只出 NSIS）。ARM64 job 标 `continue-on-error`，release 条件改为 `always() && needs.build-macos.result=='success'`，实验性架构失败不阻断其余产物发布。新增 cargo 缓存。版本号统一对齐 0.2.0（此前 4 个文件一直停留 0.1.0，导致所有 tag 产物文件名都叫 EGrab_0.1.0） | planner |
+| 2026-08-29 | **本地无 Rust 工具链下的验证策略**：确认本机 `cargo`/`rustc` 均不存在，遵循 AGENTS.md §8.8「本地不做编译，走 GitHub CI」。采用三级离线验证替代：① Node 校验 rules.json 合法性 + 4 个 JS 文件语法；② 真实数据 fixture 跑 extract 脚本做回归断言；③ `npx tsc --noEmit` 零错误。Rust 首次编译由 CI 承担 | planner |
+| 2026-09-01 | **v0.2.0 用户实测 + JD 二次失灵定位**：用户在 Windows 真机测试。天猫完全恢复（gallery 5/detail 11/skus 1/specs 36/price 192.06~198）。JD item 1444522840 仍故障：gallery 命中 35 张含大量图标、cover 取到图标、detail 36 张混入推荐位、skus 为 0。结论：v0.2.0 选择器"抗哈希但过宽"，需内容过滤而非继续收窄 | planner |
+| 2026-09-01 | **京东规则 v3（commit 13fc506）**：加内容过滤层——isJdProductImage（jfs/ 路径 + 噪声路径黑名单）、passSizeGate（<150px 拒收但放行 sNxN_jfs 缩略图）、inExcludedZone（recommend/comment/shop/banner 等排除区）、gallery 5 组分层第一组命中即停、封面独立取大图、SKU 重写覆盖新旧规格结构、详情 wrapper 排除区过滤。自诊断字段 gallerySample/coverUrl/rejectedSample 等。实测 item 10026681425538：gallery 2（仍混入 1 张视频播放图标）、detail 11（混入 2 张小图标）、price 87 正确、sku 1 | planner |
+| 2026-09-01 | **用户提供真实京东 HTML → 规则 v4（commit a12f306）**：基于完整 DOM 定位 4 个真 bug——① imgzone 被误列噪声路径（详情长图恰恰全在 imgzone/jfs/，v3 会全滤掉）② imgtools 拼写错误（实际 imagetools，导致播放图标漏网）③ [class*=scoped] 详情容器过宽（13 个匹配混入缩略图/图标）④ gallery 需排除 img.thumbnails-play-icon。修复后按真实 DOM 还原 stub 做离线回归 13/13 全过（gallery 5 去重无图标/封面 s1440x1440/详情 12 张全 imgzone/价格 87/SKU 带图）。规则包版本 3→4 | planner |
+| 2026-09-01 | **Windows 快捷方式失灵排查**：用户报告快捷方式无图标且打不开、目标指向 %LOCALAPPDATA%\EGrab\egrab.exe。排查结论：① v0.2.0 首次同时产出 MSI+NSIS 两个 x64 包，装到不同目录互相冲突，卸载其一留下死快捷方式 ② 用户另把 ARM64 包装到 x64 机器（文件存在但无法执行，空白图标+双击无反应），属架构选错而非杀软 ③ %LOCALAPPDATA% 未签名 exe 是杀软重点拦截对象。修复（v0.2.1，commit b6b9ef0）：x64 只出 MSI、mainBinaryName=EGrab、NSIS perMachine+installerIcon+简体中文、版本号对齐 0.2.1 | planner |
+| 2026-09-01 | **复盘结论（京东为何"之前能抓后来失灵"）**：京东 6 月→9 月一次前端改版动了两个层面——数据层（pageConfig.product 被清空）+ 表现层（CSS-Module 哈希类名变化），v0.2.0 前的解析器恰好同时依赖这两者，所以主图/价格/店铺一起丢；同期用稳定 ID（#detail-main）的详情图和规格存活，反向验证根因。架构教训（TD-009）：真正的故障不是某个选择器失效，而是"修选择器的成本太高"（改 Rust→CI 编译→重发安装包→全员重装），v0.2.0 规则外置后修复成本降为改一个文本文件 | planner |
 
 ---
 
@@ -457,4 +510,4 @@ module.exports = {
 
 ---
 
-*最后更新: 2026-05-11 (京东解析器修复：详情图片提取 + avif→jpg 格式转换)*
+*最后更新: 2026-08-29 (v0.2.0 抓取规则外置引擎 + JD/天猫解析修复 + 双平台双架构构建矩阵)*

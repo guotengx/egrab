@@ -1,6 +1,7 @@
 # EGrab - 技术看板
 
-> 由 architect 维护。记录前后端接口对接进度、模块开发状态和技术决策。
+> 由 planner 维护。记录前后端接口对接进度、模块开发状态和技术决策。
+> **当前模式**：单 Agent 模式（planner 全能开发者独立完成所有工作）。
 
 ---
 
@@ -25,20 +26,22 @@
 
 | 模块 | 路径 | 职责 | 负责人 | 状态 | 接口定义 | 测试覆盖 |
 |------|------|------|--------|------|---------|---------|
-| models | src-tauri/src/models/ | 全局数据模型定义（与PRD 3.1.2对齐） | architect | ✅ done | L5 protocols | ✅ unit + serde (25 tests) |
-| cdp | src-tauri/src/cdp/ | CDP连接管理、WebSocket通信、页面导航 | backend | ✅ done | L5 cdp-manager | ✅ unit + serde (12 tests) |
-| scraper | src-tauri/src/scraper/ | 抓取引擎核心，协调解析器和下载器 | architect | ✅ done | L5 scraper-engine | ✅ unit |
-| parser/taobao | src-tauri/src/parser/taobao.rs | 淘宝/天猫商品页解析器 | architect | ✅ done | L5 parser | ✅ unit |
-| parser/jd | src-tauri/src/parser/jd.rs | 京东商品页解析器 | architect | ✅ done | L5 parser | ✅ unit |
-| downloader | src-tauri/src/downloader/ | 图片批量下载器（并发控制、重试） | backend | ✅ done | L5 downloader | ✅ unit |
-| storage | src-tauri/src/storage/ | 存档引擎（SQLite + JSON + 文件系统） | backend | ✅ done | L5 storage | ✅ unit |
-| commands | src-tauri/src/commands/ | Tauri IPC命令定义（前端可调用的接口） | architect | ✅ done | L5 ipc-commands | ✅ unit + serde (6 tests) |
-| config | src-tauri/src/config/ | 应用配置管理 | backend | ✅ done | L5 config | ✅ unit |
-| pages | src/pages/ | 页面组件（Home, Progress, Archive, Settings） | frontend | ✅ done | - | ✅ tsc |
-| components | src/components/ | 可复用UI组件 | frontend | ✅ done | - | ✅ tsc |
-| stores | src/stores/ | Svelte状态管理（连接状态、任务状态等） | frontend | ✅ done | - | ✅ tsc |
-| resize | src-tauri/src/resize/ | 图片等比缩放（输出到 proportioned/ 子目录） | backend | 🔄 重构中 | L5 data-models | 🔲 待更新 |
-| services | src/services/ | Tauri IPC调用封装 | frontend | ✅ done | L5 ipc-commands | ✅ tsc |
+| models | src-tauri/src/models/ | 全局数据模型定义（与PRD 3.1.2对齐） | planner | ✅ done | L5 protocols | ✅ unit + serde (25 tests) |
+| cdp | src-tauri/src/cdp/ | CDP连接管理、WebSocket通信、页面导航 | planner | ✅ done | L5 cdp-manager | ✅ unit + serde (12 tests) |
+| scraper | src-tauri/src/scraper/ | 抓取引擎核心，协调解析器和下载器；wait/expand/scroll 参数从规则包读取 | planner | ✅ done | L5 scraper-engine | ✅ unit |
+| parser/rules | src-tauri/src/parser/rules.rs | **规则驱动的通用解析器**（v0.2.0 起替代所有平台专属解析器） | planner | ✅ done | L5 parser | ✅ unit (9 tests) |
+| rules（规则包） | src-tauri/rules/ | 外置抓取规则：rules.json + 各平台 extract/expand JS，随二进制内嵌并释放到磁盘 | planner | ✅ done | rules/README.md | ✅ 内嵌规则校验 + JS 离线回归 |
+| ~~parser/taobao~~ | ~~src-tauri/src/parser/taobao.rs~~ | 已于 v0.2.0 删除（558 行），逻辑迁移至 `rules/taobao.extract.js` | - | ❌ removed | - | - |
+| ~~parser/jd~~ | ~~src-tauri/src/parser/jd.rs~~ | 已于 v0.2.0 删除（727 行），逻辑迁移至 `rules/jd.extract.js` | - | ❌ removed | - | - |
+| downloader | src-tauri/src/downloader/ | 图片批量下载器（并发控制、重试） | planner | ✅ done | L5 downloader | ✅ unit |
+| storage | src-tauri/src/storage/ | 存档引擎（SQLite + JSON + 文件系统） | planner | ✅ done | L5 storage | ✅ unit |
+| commands | src-tauri/src/commands/ | Tauri IPC命令定义（前端可调用的接口） | planner | ✅ done | L5 ipc-commands | ✅ unit + serde (6 tests) |
+| config | src-tauri/src/config/ | 应用配置管理 | planner | ✅ done | L5 config | ✅ unit |
+| pages | src/pages/ | 页面组件（Home, Progress, Archive, Settings） | planner | ✅ done | - | ✅ tsc |
+| components | src/components/ | 可复用UI组件 | planner | ✅ done | - | ✅ tsc |
+| stores | src/stores/ | Svelte状态管理（连接状态、任务状态等） | planner | ✅ done | - | ✅ tsc |
+| resize | src-tauri/src/resize/ | 图片等比缩放（输出到 proportioned/ 子目录） | planner | ✅ done | L5 data-models | ✅ tsc |
+| services | src/services/ | Tauri IPC调用封装 | planner | ✅ done | L5 ipc-commands | ✅ tsc |
 
 ---
 
@@ -57,8 +60,18 @@
 | open_folder | ✅ done | ✅ done | ✅ 类型对齐 |
 | get_config | ✅ done | ✅ done | ✅ 类型对齐 |
 | set_config | ✅ done | ✅ done | ✅ 类型对齐 |
-| cdp_auto_connect | 🔲 L5 defined | 🔲 pending | 🔲 pending |
-| resize_images | ✅ done | ✅ done | 🔄 返回类型需对齐 ResizeResult |
+| cdp_auto_connect | ✅ done | ✅ done | ✅ 类型对齐（v0.1.12 起用于 Edge 兼容） |
+| cdp_navigate | ✅ done | ✅ done | ✅ 类型对齐 |
+| delete_task | ✅ done | ✅ done | ✅ 类型对齐 |
+| get_cover_image | ✅ done | ✅ done | ✅ 类型对齐 |
+| resize_images | ✅ done | ✅ done | ✅ 类型对齐 |
+| get_rules_info | ✅ done (v0.2.0) | ✅ done | ✅ 类型对齐 |
+| reload_rules | ✅ done (v0.2.0) | ✅ done | ✅ 类型对齐 |
+| open_rules_folder | ✅ done (v0.2.0) | ✅ done | ✅ 类型对齐 |
+| dump_page_snapshot | ✅ done (v0.2.0) | ✅ done | ✅ 类型对齐 |
+
+> **注**：v0.2.0 新增的 4 个规则/诊断命令属于运维辅助接口，未写入 L2 ARCHITECTURE 5.1 的核心 IPC 表，
+> 不影响 AGENTS.md §2.2 的命名一致性铁律（该铁律约束的是 12 个核心业务命令）。
 
 ---
 
@@ -93,7 +106,7 @@
 | 项目 | 内容 |
 |------|------|
 | **目标** | 验证 chromiumoxide 与 Tauri async runtime 配合方式 |
-| **负责人** | backend |
+| **负责人** | planner |
 | **验证内容** | 1. Cargo.toml 中 chromiumoxide 的 features 配置（需要 `tokio-runtime`，禁用默认 features）<br>2. 连接 `127.0.0.1:9222` → `navigate("about:blank")` → `evaluate("1+1")` → 断言返回 `2`<br>3. handler future 必须 spawn 后台任务驱动 |
 | **验收标准** | 最小可运行的 CDP 连接 + evaluate 示例 |
 | **状态** | pending |
@@ -103,17 +116,17 @@
 | 项目 | 内容 |
 |------|------|
 | **目标** | 验证淘宝商品页多来源解析策略 |
-| **负责人** | backend |
+| **负责人** | planner |
 | **验证内容** | 1. 准备 3 个不同年代的淘宝商品 URL（老 PC 站/H5/天猫旗舰店）<br>2. 验证 `g_config`、`__INITIAL_DATA__`、`window.__data__`、SSR JSON 等多来源解析<br>3. 断言三套 parser 路径都能产出非空 ProductData |
 | **验收标准** | 至少 2 个来源解析成功，失败时正确记录 raw_data 并标记 partial |
-| **状态** | pending |
+| **状态** | ⛔ 已由 TD-009 取代 —— 多来源兜底逻辑已下沉到规则脚本 `taobao.extract.js`（ICE 路由遍历兜底 + DOM 兜底），不再需要独立 Spike |
 
 ### Spike 3：Windows 打包体积测试
 
 | 项目 | 内容 |
 |------|------|
 | **目标** | 验证 Windows 打包体积是否 < 15MB |
-| **负责人** | maintainer |
+| **负责人** | planner |
 | **验证内容** | 1. `cargo build --release` 后测量体积<br>2. 如果超标，尝试优化方案：<br>　　- reqwest 仅启用 `rustls-tls`<br>　　- tokio 选择最小 feature 子集<br>　　- `[profile.release] opt-level = "z", lto = true, codegen-units = 1, strip = true` |
 | **验收标准** | Windows .msi/.exe < 15MB，或给出明确优化方案 |
 | **状态** | pending |
@@ -303,4 +316,162 @@ Phase 5 和 Phase 6 全面检查通过。代码质量良好，接口一致性全
 
 ---
 
-*最后更新: 2026-05-15 by architect (TD-008: 图片等比缩放架构重构)*
+### TD-009: 抓取规则外置引擎 —— 解析逻辑从二进制中剥离（v0.2.0）
+
+- **日期**: 2026-08-29
+- **背景**: 京东主图、天猫价格/规格/SKU 同时抓不到。根因排查结论：
+  1. **京东**：`pageConfig.product` 已被平台清空（仅剩 `chooseLOCShop`/`colorApiDomain`），
+     DOM 兜底用的 `._gallery_116km_1` 是 CSS-Module **构建哈希类名**，京东每次发版哈希都变 → `GALLERY_EMPTY`
+  2. **天猫**：数据源仍在 `__ICE_APP_CONTEXT__`，但取值路径全部错位：
+     - 价格实际在 `skuCore.sku2info[skuId].price.priceMoney`（单位分），旧代码读 `sku2info/0.priceText`（该键不存在）
+     - 规格实际在 `plusViewVO.industryParamVO.basicParamList`，旧代码找已废弃的 `.attributes-list li`
+     - SKU 实际在 `skuBase.props` + `skuBase.skus` + `skuCore.sku2info`，旧代码找已废弃的 `g_config.idata.sku`
+- **核心结论**: 平台改版是常态而非异常，**把易变的解析规则编译进二进制是架构错误**。
+  每次适配都要走「改 Rust → CI 编译 10 分钟 → 重新分发安装包 → 全员重装」，成本与收益严重失衡。
+- **决策**: 建立外置规则包引擎，解析规则以可编辑文件形式存放于磁盘，抓取时动态加载。
+
+- **架构**:
+  ```
+  src-tauri/rules/                    随二进制 include_str! 内嵌（永久兜底）
+    ├── rules.json                    平台匹配 / item_id 提取 / 就绪判定 / 滚动参数
+    ├── {platform}.extract.js         数据提取脚本（返回 ProductData 形状的 JSON）
+    ├── {platform}.expand.js          详情区展开脚本（滚动前执行）
+    └── README.md                     排查手册 + 抗改版写法
+
+           ↓ 首次启动释放 / 版本升级时备份覆盖
+
+  <app_data>/com.egrab.app/rules/     用户可直接编辑，改完保存即生效
+    └── snapshots/                    dump_page_snapshot 输出
+  ```
+
+- **关键设计**:
+  | 设计点 | 做法 | 目的 |
+  |--------|------|------|
+  | 加载优先级 | 磁盘 > 内嵌 | 用户改动优先，同时保证永远有可用规则 |
+  | 容错 | 磁盘 JSON 解析失败 → 自动回退内嵌 + 记录 error | 改坏规则文件不会让程序变砖 |
+  | 无缓存 | 每次抓取重新读盘 | 编辑后立即生效，不需重启 |
+  | 版本升级 | 内嵌 version > 磁盘 version 时备份为 `*.bak` 后覆盖 | 既能推送修复，又不静默丢用户改动 |
+  | 安全 | `*_js_file` 拒绝含 `/` `\` `..` 的文件名 | 防目录穿越 |
+  | 扩展性 | 新增平台 = 改 rules.json + 加一个 JS 文件 | 零 Rust 改动即可支持 1688/拼多多等 |
+
+- **Rust 侧职责收缩为**：执行 JS → 反序列化 → 图片 URL 清洗（`image_cleaner: taobao/jd/none`）→ 映射为 `ProductData`。
+  **不再含任何平台专属逻辑**，删除 `parser/jd.rs`(727 行) 与 `parser/taobao.rs`(558 行)。
+
+- **抗改版编码规范**（已写入 `rules/README.md`）：
+  ```js
+  // ❌ 平台发版即失效
+  document.querySelectorAll('._gallery_116km_1 .image-carousel-track img')
+  // ✅ 子串匹配，哈希变了照样命中
+  document.querySelectorAll('[class*="gallery"] img, [class*="carousel"] img')
+  ```
+  同理 SSR JSON 不写死路由名，`ice.loaderData.home` 取不到时遍历 `loaderData` 找含 `item` 的节点。
+
+- **配套诊断能力**:
+  - `dump_page_snapshot`：导出完整 DOM + 12 个候选全局变量 + 图片清单 + id/class 清单 → `snapshots/`
+  - `raw.json` 新增 `counts` 段（gallery/detail_images/skus/specs/price_min/price_max），一眼定位失效字段
+  - 新增 `PRICE_MISSING`、`SPECS_EMPTY`、`EXTRACT_JS_RETURNED_NULL` 三个降级告警码
+  - 设置页新增：打开规则目录 / 校验规则 / 导出页面快照
+
+- **验证方式**: 本机无 Rust 工具链，采用两级离线验证：
+  1. Node 校验 `rules.json` 合法性 + 4 个 JS 文件语法
+  2. 用用户提供的**真实天猫 raw.json** 构造 fixture，stub DOM 后跑 `taobao.extract.js`，
+     8 条回归断言全通过（price 168.06~198、specs 7 条、sku price=198 stock=200 等）
+  3. `npx tsc --noEmit` 零错误；Rust 首次编译由 CI 承担
+
+- **遗留风险**: 京东选择器缺少真实 DOM 快照校准，属最佳猜测。若 `counts.gallery` 仍为 0，
+  经 `dump_page_snapshot` 取快照后修改 `jd.extract.js` 即可，**该轮修复不需要重新编译**。
+
+---
+
+### TD-010: 构建矩阵扩展到双平台双架构（v0.2.0）
+
+- **日期**: 2026-08-29
+- **决策**: `.github/workflows/build.yml` 扩展为 4 个构建目标
+
+| 平台 | 架构 | target triple | 产物 | 稳定性 |
+|------|------|---------------|------|--------|
+| macOS | aarch64 | `aarch64-apple-darwin` | `.dmg` | 稳定 |
+| macOS | x86_64 | `x86_64-apple-darwin` | `.dmg` | 稳定 |
+| Windows | x86_64 | `x86_64-pc-windows-msvc` | `.msi` + `.exe`(NSIS) | 稳定 |
+| Windows | aarch64 | `aarch64-pc-windows-msvc` | `.exe`(NSIS) | 实验性 |
+
+- **Windows ARM64 只出 NSIS 不出 MSI**：WiX v3 在 ARM64 上产 MSI 不稳定，NSIS 安装包在
+  ARM64 Windows 上原生可用，是更可靠的路径。
+- **该 job 标记 `continue-on-error: true`**，release job 条件改为
+  `always() && needs.build-macos.result == 'success'`，确保实验性架构失败不阻断其余三个产物发布。
+- macOS 改为 matrix 并行构建（此前是串行两次 build），DMG 文件名追加 `_aarch64` / `_x86_64` 后缀避免覆盖。
+- 新增 cargo registry + target 缓存。
+- **版本号统一对齐到 0.2.0**：`package.json` / `Cargo.toml` / `Cargo.lock` / `tauri.conf.json`
+  此前一直停留在 0.1.0，导致 v0.1.1~v0.1.15 所有产物文件名都叫 `EGrab_0.1.0`。
+
+> **TD-010 修正（v0.2.1，2026-09-01）**：上表中"Windows x86_64 产物 = MSI + NSIS"已废止。
+> v0.2.0 用户实测发现双安装包互相冲突（MSI 装 `C:\Program Files\EGrab\`，NSIS currentUser 装
+> `%LOCALAPPDATA%\EGrab\`，并存产生死快捷方式），且 %LOCALAPPDATA% 未签名 exe 易被杀软拦截。
+> **自 v0.2.1 起 Windows x64 只出 MSI**，详见 TD-011。
+
+---
+
+### TD-011: 用户实测修复轮 —— JD 规则 v3/v4 + Windows 安装器修正（v0.2.1）
+
+- **日期**: 2026-09-01
+- **背景**: v0.2.0 发布后用户 Windows 真机实测，暴露两类问题——京东解析仍有噪声、Windows 安装包冲突。
+
+#### 京东规则 v3（盲写内容过滤层，commit 13fc506）
+
+- v0.2.0 的选择器"抗哈希但过宽"：实测 gallerySelectorHits=35（含图标）、cover 取到图标、
+  detail 36 张混入推荐位、skus=0。修法是**加内容过滤而非收窄选择器**：
+  | 机制 | 作用 |
+  |------|------|
+  | `isJdProductImage()` | 商品图必须在 `jfs/` 路径，排除装修/活动图路径 |
+  | `passSizeGate()` | 拒收 <150px 小图，但放行 `sNxN_jfs` 尺寸标记的缩略图条（天然 54px，清洗后可取原图） |
+  | `inExcludedZone()` | 排除 recommend/comment/rate/shop/banner/guess/hotsale/rank 区域 |
+  | gallery 5 组分层 | 精确→宽泛逐组尝试，第一组有产出即停 |
+  | 封面独立取大图 | `#spec-n1`/`mainImage`/`bigImg` 优先，退回 gallery[0] |
+  | SKU 重写 | 覆盖 #choose-attrs 老版 + specification 新版，`data-value` 与内联文本双通道 |
+- 自诊断字段：`gallerySample` / `coverUrl` / `detailSample` / `rejectedSample`（被拒样本+原因）/
+  `galleryGroupUsed` / `skuRootCount` —— 保证下轮免快照定位。
+- 实测残留：视频播放图标混入 gallery、2 张 imagetools 小图标混入 detail → 引出 v4。
+
+#### 京东规则 v4（真实 HTML 校准，commit a12f306）
+
+- 用户提供完整京东页面 HTML（item 10026681425538），按真实 DOM 定位 4 个 bug：
+  1. **`imgzone` 误列噪声路径** —— 详情长图实测全在 `imgzone/jfs/`，v3 会全滤掉。移除。
+  2. **`imgtools` 拼写错误** —— 京东实际是 `imagetools`。修正后视频播放图标被正确拦截。
+  3. **`[class*="scoped"]` 详情容器过宽** —— 页面有 13 个 scoped 容器（店铺/标题/tab/参数/售后…），
+     详情只是其一。改为按容器 ID 精确取（`#detail-main` / `#detail-top` / `#detail` / `related-layout-*`）。
+  4. **gallery 播放图标** —— 缩略图条第一条 item 内叠 `img.thumbnails-play-icon`。
+     改为优先 `.thumbnails img.image`（类名稳定），显式排除 play-icon，`#spec-img` 大图 + `jdKey` 去重。
+- **真实结构基线（2026-09 存档）**：缩略图条 `.thumbnails .item img.image`（pcpubliccms/s228x228_jfs）、
+  主图 `#spec-img`（pcpubliccms/s1440x1440_jfs）、详情 `#detail-main img`（imgzone/jfs/）、
+  价格 `.product-price--main .product-price--value`、店铺 `.top-name`、
+  SKU `.specification-item-sku`（`-image` s48x48_jfs + `-text`）、规格 `.attrs .item .label/.value`。
+- 验证方式：按真实 HTML 还原 DOM stub，离线回归 **13/13 断言全过**
+  （gallery 5 去重无图标 / 封面 s1440x1440 / 详情 12 张全 imgzone 且滤掉 2 张图标 /
+  价格 87 不再抓错 187 / SKU 带 s48x48 图 / 规格 6 条）。
+- 教训：**对抗性设计（抗哈希）只能保证方向对，不能保证细节对；没有真实页面样本时，
+  路径黑名单类规则极易写错（imgzone 误杀、imagetools 拼写），容器级精确选择器 > 路径黑名单。**
+
+#### Windows 安装器修正
+
+- x64 只出 MSI（消除双包冲突）；`mainBinaryName: "EGrab"`（任务管理器/防火墙显示正确名称）；
+  NSIS `perMachine` + `installerIcon` + 简体中文（ARM64 包也进 Program Files，规避杀软拦截）。
+- 附带诊断结论：用户"ARM64 包打不开"是**架构装错**（x64 Windows 无法执行 ARM64 二进制，
+  表现为空白图标+双击无反应），非杀软问题；快捷方式失灵根因是双安装包并存。
+
+---
+
+### 遗留风险清单（未决，非本期修复范围）
+
+- **R-1 `identifier` 双轨隐患（2026-09-01 发现，口头承诺记录但此前漏记，现补录）**：
+  `tauri.conf.json` 的 identifier 是 `com.egrab.desktop`，而 Rust 代码数据目录全部硬编码为
+  `com.egrab.app`（规则包、index.db、CDP profile）。目前两边各自自洽所以正常跑，但属于定时炸弹——
+  一旦改用 Tauri 官方 path API 就会指向另一个目录；若改 identifier 会变更 MSI UpgradeCode 导致
+  新版装不上（并存两个）；若改 Rust 路径会让用户已抓数据和登录态"凭空消失"。
+  **需要单独设计一次数据迁移才能动，本期不动。**
+- **R-2 Windows 代码签名**：360 误报（2026-06-11 记录）的长期方案是购买 Authenticode 证书，未实施。
+- **R-3 v0.2.1 待真机验证**：CI 构建结果 + 用户实测 counts 段（预期 gallery=5 / detail=12），
+  以及 %LOCALAPPDATA%\EGrab 错架构残留需用户手动卸载。
+
+---
+
+*最后更新: 2026-09-01 by planner (TD-011 用户实测修复轮 + R-1~R-3 遗留风险补录；TD-010 产物表已按 v0.2.1 修正)*
