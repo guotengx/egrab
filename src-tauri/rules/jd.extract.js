@@ -99,8 +99,12 @@
   }
 
   // 严格版：只收商品图，并记录被拒样本用于下一轮诊断。
+  // skipZone=true 时跳过"排除区"检查——仅用于策略3：
+  // 详情容器(#detail-main 等)已按 ID 精确锁定且容器级已过滤，
+  // 容器内部的资质/标签子模块 class 可能含 shop/banner 等词
+  // （实测 POP 商品 14010763782 有 3 张 790px 详情图因此被误杀）。
   var rejected = [];
-  function pushProductImg(arr, seen, im, raw) {
+  function pushProductImg(arr, seen, im, raw, skipZone) {
     var u = toAbs(raw);
     if (!u) return;
     if (!isJdProductImage(u)) {
@@ -111,7 +115,7 @@
       if (rejected.length < 12) rejected.push({ why: 'too_small', u: u.slice(0, 140) });
       return;
     }
-    if (im && inExcludedZone(im)) {
+    if (!skipZone && im && inExcludedZone(im)) {
       if (rejected.length < 12) rejected.push({ why: 'excluded_zone', u: u.slice(0, 140) });
       return;
     }
@@ -231,7 +235,14 @@
   var shopEl = document.querySelector('[class*="shop-name"] a, [class*="shopName"] a, [class*="shop-name"], [class*="shopName"], .top-name, #popbox .mname a');
   if (shopEl) {
     out.shop.name = (shopEl.textContent || '').trim();
-    var href = shopEl.getAttribute && shopEl.getAttribute('href');
+    // querySelector 按文档序返回——shopEl 可能是容器本身而非 <a>，
+    // 此时容器没有 href，需要向下找一层 <a> 取店铺链接。
+    var linkEl = shopEl;
+    if (!(linkEl.getAttribute && linkEl.getAttribute('href'))) {
+      var innerA = linkEl.querySelector ? linkEl.querySelector('a') : null;
+      if (innerA) linkEl = innerA;
+    }
+    var href = linkEl.getAttribute && linkEl.getAttribute('href');
     if (href) out.shop.url = href.indexOf('//') === 0 ? 'https:' + href : href;
   }
 
@@ -360,13 +371,15 @@
   // 2026-09 实测：页面有 13 个 [class*="scoped"] 容器（店铺/标题/tab/参数/售后…），
   // 详情只是其中一个，靠排除区过滤仍会漏进缩略图和图标。
   // 详情长图实测全在 #detail-main（imgzone/jfs/），直接按容器 ID 精确取。
+  // 容器级已做排除区过滤，容器内逐图不再做 zone 检查（skipZone=true），
+  // 否则资质/标签子模块（class 含 shop/banner 等词）里的详情图会被误杀。
   var wrappers = qsa('#detail-main, #detail-top, #detail, [id^="related-layout-"]')
     .filter(function (w) { return !inExcludedZone(w); });
   var imgCount = 0;
   wrappers.forEach(function (w) {
     Array.prototype.slice.call(w.querySelectorAll('img')).forEach(function (im) {
       imgCount++;
-      pushProductImg(out.detail_images, seenD, im, imgSrc(im));
+      pushProductImg(out.detail_images, seenD, im, imgSrc(im), true);
     });
   });
   dbg.wrapperCount = wrappers.length;

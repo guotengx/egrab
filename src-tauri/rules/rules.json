@@ -1,6 +1,6 @@
 {
-  "version": 4,
-  "updated_at": "2026-09-01",
+  "version": 5,
+  "updated_at": "2026-09-12",
   "note": "EGrab 抓取规则包。修改本目录下的文件后保存，下一次抓取立即生效，无需重新编译或重装程序。",
   "platforms": [
     {
