@@ -568,6 +568,33 @@ impl CdpManager {
         Ok(value)
     }
 
+    /// Activates the active page's tab (CDP `Page.bringToFront`).
+    ///
+    /// Chrome stops rendering hidden tabs (background tab / minimized window),
+    /// so IntersectionObserver-driven lazy floors — JD's detail and spec
+    /// sections — never load. Activating the tab before scrolling avoids that.
+    pub async fn bring_to_front(&self) -> Result<(), IpcError> {
+        let guard = self.inner.lock().await;
+
+        let page = guard.active_page.as_ref().ok_or_else(|| IpcError {
+            code: ErrorCode::CdpConnectFailed,
+            message: "No active page; call navigate() first".to_string(),
+            recoverable: true,
+            step: Some(ScrapeStep::PageLoading),
+            details: None,
+        })?;
+
+        page.bring_to_front().await.map_err(|e| IpcError {
+            code: ErrorCode::CdpConnectFailed,
+            message: format!("Failed to bring page to front: {}", e),
+            recoverable: true,
+            step: Some(ScrapeStep::PageLoading),
+            details: None,
+        })?;
+
+        Ok(())
+    }
+
     // -----------------------------------------------------------------------
     // Private helpers
     // -----------------------------------------------------------------------

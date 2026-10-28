@@ -14,23 +14,59 @@ pub mod storage;
 use tauri::Manager;
 use tauri::WindowEvent;
 
+/// 日志文件超过这个大小时，启动时轮转为 egrab.log.1。
+const LOG_ROTATE_BYTES: u64 = 5 * 1024 * 1024;
+
+/// 初始化诊断日志：同时输出到 stderr 和 `<app_data>/logs/egrab.log`。
+///
+/// Windows 安装版没有控制台，导航超时这类失败不会生成 raw.json，
+/// 日志文件是排查时唯一的现场记录。日志文件打不开时退回只输出 stderr。
+fn init_tracing() {
+    use tracing_subscriber::fmt::writer::MakeWriterExt;
+
+    let level = if cfg!(debug_assertions) {
+        tracing::Level::DEBUG
+    } else {
+        tracing::Level::INFO
+    };
+
+    match open_log_file() {
+        Some(file) => {
+            let writer = std::io::stderr.and(std::sync::Mutex::new(file));
+            tracing_subscriber::fmt()
+                .with_max_level(level)
+                .with_ansi(false)
+                .with_writer(writer)
+                .init();
+        }
+        None => {
+            tracing_subscriber::fmt().with_max_level(level).init();
+        }
+    }
+}
+
+/// 以追加模式打开 `<app_data>/logs/egrab.log`；超过 LOG_ROTATE_BYTES 时先轮转。
+fn open_log_file() -> Option<std::fs::File> {
+    let dir = parser::rules::app_data_dir().join("logs");
+    std::fs::create_dir_all(&dir).ok()?;
+    let path = dir.join("egrab.log");
+    if let Ok(meta) = std::fs::metadata(&path) {
+        if meta.len() > LOG_ROTATE_BYTES {
+            let rotated = dir.join("egrab.log.1");
+            let _ = std::fs::remove_file(&rotated);
+            let _ = std::fs::rename(&path, &rotated);
+        }
+    }
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .ok()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Initialize tracing subscriber for diagnostic logging.
-    // In dev mode, use a verbose subscriber that prints to stderr.
-    // In release mode, log only warnings and errors to keep noise low.
-    #[cfg(debug_assertions)]
-    {
-        tracing_subscriber::fmt()
-            .with_max_level(tracing::Level::DEBUG)
-            .init();
-    }
-    #[cfg(not(debug_assertions))]
-    {
-        tracing_subscriber::fmt()
-            .with_max_level(tracing::Level::INFO)
-            .init();
-    }
+    init_tracing();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())

@@ -1,7 +1,7 @@
 {
   "productName": "EGrab",
   "mainBinaryName": "EGrab",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "identifier": "com.egrab.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",

@@ -219,9 +219,19 @@ impl ScraperEngine {
         }
         tracing::info!(task_id = %task_id, "CDP navigation succeeded");
 
+        // 把抓取用的标签页切到前台：标签页在后台或浏览器窗口最小化时 Chrome 不渲染页面，
+        // 京东「商品介绍」「规格参数」这类懒加载楼层就永远不会触发。
+        let brought_to_front = match cdp.bring_to_front().await {
+            Ok(()) => true,
+            Err(e) => {
+                tracing::warn!(error = %e.message, "bring_to_front failed (non-fatal)");
+                false
+            }
+        };
+
         // 页面就绪判定、详情区展开、滚动参数全部来自外置规则包，
         // 平台改版时改规则文件即可，无需重新编译。
-        let rule = parser::rules::find_rule(&url);
+        let (rule, rules_source) = parser::rules::find_rule_with_source(&url);
         if let Some(ref r) = rule {
             tracing::info!(platform = %r.id, "Loaded platform rule from rule pack");
         } else {
@@ -298,6 +308,49 @@ impl ScraperEngine {
         // Wait for lazy-loaded images to appear after scrolling.
         tokio::time::sleep(std::time::Duration::from_millis(scroll.settle_ms)).await;
 
+        // 就绪判定：轮询规则包里的 ready_js，直到详情区渲染完成或超时。
+        // 脚本本身会把还没加载的楼层滚进可视区域；超时不报错，照常提取。
+        let mut ready_state = "skipped";
+        let mut ready_waited_ms: u64 = 0;
+        if let Some(ready_js) = rule.as_ref().and_then(|r| r.ready_js.clone()) {
+            let timeout_ms = rule.as_ref().map(|r| r.ready_timeout_ms).unwrap_or(10_000);
+            let poll_ms: u64 = 500;
+            ready_state = "timeout";
+            loop {
+                if let Ok(v) = cdp.evaluate(&ready_js).await {
+                    if v.as_bool() == Some(true) {
+                        ready_state = "ready";
+                        break;
+                    }
+                }
+                if ready_waited_ms >= timeout_ms {
+                    break;
+                }
+                if ready_waited_ms == 0 {
+                    // 第一次没就绪：可能用户中途切走了窗口，再把标签页切回前台。
+                    let _ = cdp.bring_to_front().await;
+                    self.emit_progress(
+                        &task_id,
+                        25,
+                        ScrapeStep::PageLoading,
+                        "Waiting for detail section",
+                    );
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(poll_ms)).await;
+                ready_waited_ms += poll_ms;
+            }
+            if ready_state == "ready" && ready_waited_ms > 0 {
+                // 楼层刚渲染出来，留一点时间让图片地址写进 DOM。
+                tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+            }
+            tracing::info!(
+                task_id = %task_id,
+                state = ready_state,
+                waited_ms = ready_waited_ms,
+                "Ready check finished"
+            );
+        }
+
         // Scroll back to top.
         let _ = cdp.evaluate("window.scrollTo(0, 0)").await;
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -312,7 +365,7 @@ impl ScraperEngine {
         // Safety: CdpManager is managed by Tauri and lives for the entire app lifetime.
         let cdp_ptr: *const CdpManager = cdp.inner();
         let page_handle = CdpPageHandle { cdp: cdp_ptr };
-        let parse_result = match platform_parser.parse(&page_handle).await {
+        let mut parse_result = match platform_parser.parse(&page_handle).await {
             Ok(result) => result,
             Err(e) => {
                 self.emit_error(
@@ -326,6 +379,29 @@ impl ScraperEngine {
                 return;
             }
         };
+
+        // 抓取过程诊断写进 raw.json：标签页是否切到前台、页面高度、就绪判定结果、
+        // 本次实际生效的规则版本与来源。用于判断「详情没加载」这类问题出在哪一步。
+        if let Some(obj) = parse_result.raw_data.as_object_mut() {
+            obj.insert(
+                "driver".to_string(),
+                serde_json::json!({
+                    "brought_to_front": brought_to_front,
+                    "page_height": page_height,
+                    "scroll_target": height_result,
+                    "ready": ready_state,
+                    "ready_waited_ms": ready_waited_ms,
+                }),
+            );
+            obj.insert(
+                "rules".to_string(),
+                serde_json::json!({
+                    "version": rules_source.version,
+                    "source": rules_source.source,
+                    "error": rules_source.error,
+                }),
+            );
+        }
 
         // Emit progress: parsing complete (60%).
         self.emit_progress(&task_id, 60, ScrapeStep::Parsing, "Parsing complete");

@@ -216,18 +216,29 @@ fn find_size_suffix_pos(url: &str) -> Option<usize> {
     None
 }
 
-/// Cleans a JD.com image URL by removing the size prefix pattern `s<W>x<H>_`.
-/// Also converts .avif to .jpg for better compatibility.
+/// Cleans a JD.com image URL to the original-resolution image.
+///
+/// - Strips the `.avif` transcoding suffix JD appends, keeping the original
+///   format (`x.jpg.avif` → `x.jpg`, `x.png.avif` → `x.png`); a bare `x.avif`
+///   becomes `x.jpg`.
+/// - Removes the size prefix pattern `s<W>x<H>_` (e.g. `/s48x48_jfs/` → `/jfs/`).
+///   This step always runs: the old early return for `.png.avif` left SKU
+///   thumbnails at 48x48.
 pub fn clean_jd_image_url(url: &str) -> String {
-    // Step 1: Convert .avif to .jpg (handle .jpg.avif case too)
-    let url = if url.ends_with(".jpg.avif") {
-        // Remove .avif, keep .jpg
-        &url[..url.len() - 5]
-    } else if url.ends_with(".avif") {
-        // Replace .avif with .jpg
-        return format!("{}.jpg", &url[..url.len() - 5]);
-    } else {
-        url
+    // Step 1: Strip the .avif transcoding suffix.
+    let url: String = match url.strip_suffix(".avif") {
+        Some(stripped) => {
+            let lower = stripped.to_ascii_lowercase();
+            let has_original_ext = [".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp"]
+                .iter()
+                .any(|ext| lower.ends_with(*ext));
+            if has_original_ext {
+                stripped.to_string()
+            } else {
+                format!("{}.jpg", stripped)
+            }
+        }
+        None => url.to_string(),
     };
 
     // Step 2: Remove size prefix pattern `/s<W>x<H>_`
@@ -250,7 +261,7 @@ pub fn clean_jd_image_url(url: &str) -> String {
         }
     }
 
-    url.to_string()
+    url
 }
 
 /// Parses a price string and returns a f64.
@@ -399,6 +410,17 @@ mod tests {
         assert_eq!(
             clean_jd_image_url("https://img.com/abc.jpg.avif"),
             "https://img.com/abc.jpg"
+        );
+    }
+
+    #[test]
+    fn test_clean_jd_image_url_png_avif_keeps_format_and_strips_size() {
+        // 京东款式栏缩略图：s48x48 + .png.avif，必须还原成原尺寸 PNG
+        assert_eq!(
+            clean_jd_image_url(
+                "https://img13.360buyimg.com/pcpubliccms/s48x48_jfs/t1/532040/3/10161/101550/6ad44b38F88434bfe/0083320320386654.png.avif"
+            ),
+            "https://img13.360buyimg.com/pcpubliccms/jfs/t1/532040/3/10161/101550/6ad44b38F88434bfe/0083320320386654.png"
         );
     }
 

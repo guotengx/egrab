@@ -207,8 +207,14 @@ async fn download_single_image(
         }
 
         match try_download(client, url, &file_path).await {
-            Ok((size_bytes, width, height)) => {
-                let relative_path = input.relative_path.clone();
+            Ok((size_bytes, width, height, corrected_ext)) => {
+                // The file was saved under its real format's extension when the
+                // CDN returned a different format than the URL suffix implied
+                // (e.g. PNG data for a `.jpg` URL); keep the indexed path in sync.
+                let relative_path = match corrected_ext {
+                    Some(ext) => replace_extension(&input.relative_path, ext),
+                    None => input.relative_path.clone(),
+                };
                 tracing::debug!(
                     "Downloaded image: {} ({} bytes, {}x{})",
                     relative_path,
@@ -261,12 +267,18 @@ async fn download_single_image(
 }
 
 /// Attempts a single HTTP GET to download an image.
-/// Returns (size_bytes, width, height) on success.
+///
+/// The file is written under the extension of its real format (sniffed from
+/// the content), not the one implied by the URL: JD serves PNG data for
+/// `.png.avif`-style URLs, and a PNG saved as `.jpg` breaks later processing.
+///
+/// Returns (size_bytes, width, height, corrected_extension) on success, where
+/// `corrected_extension` is `Some(ext)` only when the file name was changed.
 async fn try_download(
     client: &reqwest::Client,
     url: &str,
     file_path: &Path,
-) -> Result<(u64, Option<u32>, Option<u32>)> {
+) -> Result<(u64, Option<u32>, Option<u32>, Option<&'static str>)> {
     let response = client
         .get(url)
         .send()
@@ -285,14 +297,69 @@ async fn try_download(
 
     let size_bytes = bytes.len() as u64;
 
+    // Save under the real format's extension when it differs from the requested one.
+    let current_ext = file_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("");
+    let corrected_ext = sniff_image_ext(&bytes).filter(|ext| !same_image_ext(current_ext, ext));
+    let target_path = match corrected_ext {
+        Some(ext) => file_path.with_extension(ext),
+        None => file_path.to_path_buf(),
+    };
+
     // Write to file.
-    std::fs::write(file_path, &bytes)
-        .with_context(|| format!("Failed to write file: {:?}", file_path))?;
+    std::fs::write(&target_path, &bytes)
+        .with_context(|| format!("Failed to write file: {:?}", target_path))?;
 
     // Attempt to detect image dimensions.
     let (width, height) = detect_image_dimensions(&bytes);
 
-    Ok((size_bytes, width, height))
+    Ok((size_bytes, width, height, corrected_ext))
+}
+
+/// Identifies the image format from its magic bytes and returns the file
+/// extension to use, or `None` when the format is not recognized.
+fn sniff_image_ext(data: &[u8]) -> Option<&'static str> {
+    if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some("jpg")
+    } else if data.starts_with(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]) {
+        Some("png")
+    } else if data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a") {
+        Some("gif")
+    } else if data.len() >= 12 && &data[0..4] == b"RIFF" && &data[8..12] == b"WEBP" {
+        Some("webp")
+    } else if data.len() >= 12
+        && &data[4..8] == b"ftyp"
+        && (&data[8..12] == b"avif" || &data[8..12] == b"avis")
+    {
+        Some("avif")
+    } else {
+        None
+    }
+}
+
+/// Compares two image extensions case-insensitively, treating jpg and jpeg as equal.
+fn same_image_ext(a: &str, b: &str) -> bool {
+    let normalize = |e: &str| {
+        let e = e.to_ascii_lowercase();
+        if e == "jpeg" {
+            "jpg".to_string()
+        } else {
+            e
+        }
+    };
+    normalize(a) == normalize(b)
+}
+
+/// Replaces the extension of a forward-slash relative path such as
+/// `cover/cover_001.jpg`, appending one when the file name has none.
+fn replace_extension(relative_path: &str, ext: &str) -> String {
+    let name_start = relative_path.rfind('/').map(|i| i + 1).unwrap_or(0);
+    match relative_path[name_start..].rfind('.') {
+        Some(dot) => format!("{}.{}", &relative_path[..name_start + dot], ext),
+        None => format!("{}.{}", relative_path, ext),
+    }
 }
 
 /// Detects image dimensions from raw bytes (basic JPEG/PNG header parsing).
@@ -496,6 +563,35 @@ pub fn clean_jd_image_url(url: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // --- Format Sniffing Tests ---
+
+    #[test]
+    fn test_sniff_image_ext() {
+        assert_eq!(sniff_image_ext(&[0xFF, 0xD8, 0xFF, 0xE0, 0x00]), Some("jpg"));
+        assert_eq!(
+            sniff_image_ext(&[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A, 0x00]),
+            Some("png")
+        );
+        assert_eq!(sniff_image_ext(b"GIF89a\x01\x00"), Some("gif"));
+        assert_eq!(sniff_image_ext(b"RIFF\x00\x00\x00\x00WEBPVP8 "), Some("webp"));
+        assert_eq!(sniff_image_ext(b"\x00\x00\x00\x1cftypavif\x00\x00"), Some("avif"));
+        assert_eq!(sniff_image_ext(b"<html></html>"), None);
+    }
+
+    #[test]
+    fn test_same_image_ext() {
+        assert!(same_image_ext("JPEG", "jpg"));
+        assert!(same_image_ext("png", "PNG"));
+        assert!(!same_image_ext("jpg", "png"));
+    }
+
+    #[test]
+    fn test_replace_extension() {
+        assert_eq!(replace_extension("cover/cover_001.jpg", "png"), "cover/cover_001.png");
+        assert_eq!(replace_extension("sku/sku_红茶礼盒80g.jpg", "png"), "sku/sku_红茶礼盒80g.png");
+        assert_eq!(replace_extension("gallery/main_001", "jpg"), "gallery/main_001.jpg");
+    }
 
     // --- URL Cleaning Tests ---
 

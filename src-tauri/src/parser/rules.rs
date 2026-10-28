@@ -43,6 +43,7 @@ const EMBEDDED_FILES: &[(&str, &str)] = &[
     ),
     ("jd.extract.js", include_str!("../../rules/jd.extract.js")),
     ("jd.expand.js", include_str!("../../rules/jd.expand.js")),
+    ("jd.ready.js", include_str!("../../rules/jd.ready.js")),
 ];
 
 // ---- 规则数据结构 ------------------------------------------------------
@@ -81,8 +82,21 @@ pub struct PlatformRule {
     pub extract_js: Option<String>,
     #[serde(default)]
     pub extract_js_file: Option<String>,
+    /// 就绪判定脚本：滚动完成后、提取之前轮询执行，返回 true 即开始提取。
+    /// 用于等待懒加载楼层（如京东「商品介绍」「规格参数」）渲染完成。
+    #[serde(default)]
+    pub ready_js: Option<String>,
+    #[serde(default)]
+    pub ready_js_file: Option<String>,
+    /// 就绪判定最长等待时间（毫秒），超时后照常提取。
+    #[serde(default = "default_ready_timeout_ms")]
+    pub ready_timeout_ms: u64,
     #[serde(default)]
     pub scroll: ScrollRule,
+}
+
+fn default_ready_timeout_ms() -> u64 {
+    10_000
 }
 
 /// 商品 ID 提取规则。
@@ -303,6 +317,11 @@ fn resolve_script_files(pack: &mut RulePack, dir: &PathBuf) {
                 platform.expand_js = read_script(dir, file);
             }
         }
+        if platform.ready_js.is_none() {
+            if let Some(ref file) = platform.ready_js_file {
+                platform.ready_js = read_script(dir, file);
+            }
+        }
     }
 }
 
@@ -323,11 +342,19 @@ fn read_script(dir: &PathBuf, file: &str) -> Option<String> {
 
 /// 查找能处理该 URL 的平台规则。
 pub fn find_rule(url: &str) -> Option<PlatformRule> {
-    let (pack, _) = load_rule_pack();
+    find_rule_with_source(url).0
+}
+
+/// 查找平台规则，同时返回规则包来源（版本号、磁盘/内嵌），
+/// 用于写进 raw.json，核对用户电脑上实际生效的是哪一版规则。
+pub fn find_rule_with_source(url: &str) -> (Option<PlatformRule>, RuleSource) {
+    let (pack, source) = load_rule_pack();
     let lower = url.to_lowercase();
-    pack.platforms
+    let rule = pack
+        .platforms
         .into_iter()
-        .find(|p| p.match_url.iter().any(|m| lower.contains(&m.to_lowercase())))
+        .find(|p| p.match_url.iter().any(|m| lower.contains(&m.to_lowercase())));
+    (rule, source)
 }
 
 // ---- 规则驱动的解析器 --------------------------------------------------
@@ -750,6 +777,33 @@ mod tests {
                 platform.id
             );
         }
+    }
+
+    #[test]
+    fn jd_ready_script_is_resolvable() {
+        let mut p = pack();
+        resolve_script_files(&mut p, &PathBuf::from("/nonexistent-egrab-rules-dir"));
+        let jd = p
+            .platforms
+            .iter()
+            .find(|p| p.id == "jd")
+            .expect("jd rule must exist");
+        assert!(
+            jd.ready_js
+                .as_ref()
+                .map(|s| !s.trim().is_empty())
+                .unwrap_or(false),
+            "jd ready_js_file must resolve to the embedded jd.ready.js"
+        );
+        assert!(jd.ready_timeout_ms >= 1000);
+    }
+
+    #[test]
+    fn missing_ready_fields_use_defaults() {
+        let rule: PlatformRule =
+            serde_json::from_str(r#"{ "id": "x" }"#).expect("minimal rule must parse");
+        assert!(rule.ready_js.is_none());
+        assert_eq!(rule.ready_timeout_ms, 10_000);
     }
 
     #[test]
