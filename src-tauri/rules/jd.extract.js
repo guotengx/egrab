@@ -24,6 +24,10 @@
     debug: {}
   };
 
+  // 写进 raw.json，用来核对用户电脑上实际生效的是哪一版脚本。
+  var SCRIPT_VERSION = 6;
+  out.debug.scriptVersion = SCRIPT_VERSION;
+
   function toAbs(u) {
     if (!u) return '';
     u = String(u).trim().replace(/^["']+|["']+$/g, '');
@@ -124,9 +128,14 @@
     seen[k] = true;
     arr.push(u);
   }
+  // 懒加载图片的真实地址在 data-* 属性里，src 可能只是占位图（data: 或非 jfs 的 gif）。
+  // 京东老模板用 data-lazyload；新版页面渲染时会把它改写成 src。
   function imgSrc(im) {
-    return im.getAttribute('src') || im.getAttribute('data-src') ||
-           im.getAttribute('data-lazy-img') || im.getAttribute('data-origin') || '';
+    var src = im.getAttribute('src') || '';
+    var lazy = im.getAttribute('data-lazyload') || im.getAttribute('data-src') ||
+               im.getAttribute('data-lazy-img') || im.getAttribute('data-origin') || '';
+    if (lazy && (!src || src.indexOf('data:') === 0 || src.indexOf('jfs/') < 0)) return lazy;
+    return src || lazy;
   }
 
   // ───────────────────────────────────────────────────────────
@@ -187,13 +196,21 @@
   }
   if (out.gallery.length > 12) out.gallery = out.gallery.slice(0, 12);
 
-  // 封面：优先取主图区的大图，取不到再退回 gallery[0]
-  var coverEl = document.querySelector('#spec-n1 img, [class*="mainImage"] img, [class*="bigImg"] img, [class*="big-img"] img');
-  if (coverEl) {
-    var coverUrl = toAbs(imgSrc(coverEl));
-    if (isJdProductImage(coverUrl)) out.cover = coverUrl;
+  // 封面：当前选中款式的图 > 第 1 张缩略图 > 主图区大图 > gallery[0]
+  // 主图区大图（#spec-img）会跟着鼠标悬停切换（2026-10 实测：手动保存页面时停在第 3 张），
+  // 不能作为首选。多款式商品以选中款式的图为准，与京东打开页面时的默认展示一致。
+  function firstProductImage(sel) {
+    var els = qsa(sel);
+    for (var i = 0; i < els.length; i++) {
+      var u = toAbs(imgSrc(els[i]));
+      if (isJdProductImage(u)) return u;
+    }
+    return '';
   }
-  if (!out.cover) out.cover = out.gallery.length ? out.gallery[0] : '';
+  out.cover = firstProductImage('.specification-item-sku--selected img') ||
+              firstProductImage('.thumbnails img.image') ||
+              firstProductImage('#spec-n1 img, [class*="mainImage"] img, [class*="bigImg"] img, [class*="big-img"] img') ||
+              (out.gallery.length ? out.gallery[0] : '');
 
   out.debug.galleryCount = out.gallery.length;
   out.debug.gallerySample = out.gallery.slice(0, 12);
@@ -244,6 +261,16 @@
     }
     var href = linkEl.getAttribute && linkEl.getAttribute('href');
     if (href) out.shop.url = href.indexOf('//') === 0 ? 'https:' + href : href;
+  }
+  // 2026-10 实测：店铺名在 div.top-name 里（不含 <a>），店铺链接在页面别处的
+  // a[href*="mall.jd.com/index-"] 上，单独取一次。
+  if (!out.shop.url) {
+    var mallA = document.querySelector('a[href*="mall.jd.com/index-"]');
+    if (mallA) {
+      var mallHref = (mallA.getAttribute('href') || '').split('?')[0];
+      out.shop.url = mallHref.indexOf('//') === 0 ? 'https:' + mallHref : mallHref;
+      if (!out.shop.name) out.shop.name = (mallA.textContent || '').trim();
+    }
   }
 
   // ───────────────────────────────────────────────────────────
@@ -321,6 +348,10 @@
     out.debug.skuFallbackUsed = true;
   }
   out.debug.skuCount = out.skus.length;
+  // 多款式商品：记录当前页面选中的是哪个款式（URL 对应的那个 SKU）。
+  // 其他款式有各自的 skuId 和详情，需要在京东页面点选后复制新链接单独抓取。
+  var selectedSku = document.querySelector('.specification-item-sku--selected');
+  out.debug.skuSelected = selectedSku ? (selectedSku.textContent || '').trim() : '';
 
   // ───────────────────────────────────────────────────────────
   // 7. 详情图
@@ -373,8 +404,12 @@
   // 详情长图实测全在 #detail-main（imgzone/jfs/），直接按容器 ID 精确取。
   // 容器级已做排除区过滤，容器内逐图不再做 zone 检查（skipZone=true），
   // 否则资质/标签子模块（class 含 shop/banner 等词）里的详情图会被误杀。
-  var wrappers = qsa('#detail-main, #detail-top, #detail, [id^="related-layout-"]')
-    .filter(function (w) { return !inExcludedZone(w); });
+  // 2026-10 京东前端代码（pc_item_components_3 5.0.7）确认详情由多个区块拼成：
+  //   detail-top（详情顶部模板）/ detail-main（商品图文）/ detail-footer（详情底部模板）
+  //   是商品介绍本体，直接收；店铺关联版式 related-layout-* 多为促销，仍按排除区过滤。
+  var DETAIL_IDS = { 'detail-top': true, 'detail-main': true, 'detail-footer': true, 'detail': true };
+  var wrappers = qsa('#detail-top, #detail-main, #detail-footer, #detail, [id^="related-layout-"]')
+    .filter(function (w) { return DETAIL_IDS[w.id] || !inExcludedZone(w); });
   var imgCount = 0;
   wrappers.forEach(function (w) {
     Array.prototype.slice.call(w.querySelectorAll('img')).forEach(function (im) {
@@ -416,6 +451,24 @@
       .map(function (s) { return s.key + ': ' + s.value; })
       .join('\n');
   }
+
+  // ───────────────────────────────────────────────────────────
+  // 9. 页面状态诊断（写进 raw.json，用来判断"详情没加载"的具体原因）
+  //    visibility 不是 visible → 标签页在后台/被最小化，懒加载楼层不会触发
+  //    blocks 里没有 detail-main → 商品介绍楼层没渲染
+  //    failText 有值 → 京东接口返回失败（常见于风控）
+  // ───────────────────────────────────────────────────────────
+  var BLOCK_IDS = ['event-zone', 'related-layout-head', 'detail-top', 'detail-main', 'detail-footer',
+                   'related-layout-footer', 'industrial-introduction', 'detail'];
+  var pageText = document.body ? (document.body.innerText || document.body.textContent || '') : '';
+  out.debug.page = {
+    url: (window.location && window.location.href) || '',
+    visibility: document.visibilityState || '',
+    hasFocus: typeof document.hasFocus === 'function' ? document.hasFocus() : null,
+    scrollHeight: document.body ? document.body.scrollHeight : 0,
+    blocks: BLOCK_IDS.filter(function (id) { return !!document.getElementById(id); }),
+    failText: (pageText.match(/暂无商品介绍|网络出小差了|楼层加载失败/) || [''])[0]
+  };
 
   return out;
 })()

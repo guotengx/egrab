@@ -15,6 +15,7 @@
 | `taobao.expand.js` | 淘宝/天猫 详情区展开脚本（滚动前执行） |
 | `jd.extract.js` | 京东 数据提取脚本 |
 | `jd.expand.js` | 京东 详情区展开脚本（滚动前执行） |
+| `jd.ready.js` | 京东 详情区就绪判定（滚动后、提取前轮询执行，见下文） |
 | `snapshots/` | 页面快照输出目录（用于排查平台改版） |
 
 ---
@@ -27,9 +28,15 @@
    - `galleryCount = 0` → 主图选择器失效
    - `specCount = 0` → 规格参数取值路径失效
    - `priceSamples = []` → 价格取值路径失效
-   - `detailCount = 0` → 详情图选择器失效
+   - `detailCount = 0` → 详情图选择器失效，或详情楼层没加载（看下面两项区分）
+   - `page.blocks` 里没有 `detail-main` → 京东「商品介绍」楼层没渲染；
+     再看 `page.visibility`（不是 `visible` 说明浏览器在后台）和 `page.failText`（京东接口报错）
+   - `raw_data.driver.ready` → 就绪判定结果：`ready` / `timeout` / `skipped`
+   - `raw_data.rules` → 本次抓取实际生效的规则版本和来源（disk / embedded）
 3. 对照快照里的真实 DOM / JSON 结构，改对应的 `*.extract.js`。
 4. 保存，回到 EGrab 重新抓取。**不需要重启程序。**
+5. 开发者修改仓库里的京东规则后，跑一遍离线回归（真实商品页 fixture，只需要 Node）：
+   `node tests/rules/jd.test.js`
 
 ---
 
@@ -54,6 +61,17 @@
 
 图片 URL 只需返回页面上的原始地址，**去尺寸参数取原图由程序统一处理**
 （`image_cleaner` 字段控制用哪套清洗规则：`taobao` / `jd` / `none`）。
+
+---
+
+## 就绪判定：`ready_js_file` / `ready_timeout_ms`
+
+页面滚动完成后、提取数据之前，程序每 0.5 秒执行一次 `ready_js_file` 指向的脚本：
+
+- 返回 `true` → 立即开始提取；
+- 返回 `false` → 继续等待，直到超过 `ready_timeout_ms`（毫秒，默认 10000）后照常提取。
+
+脚本可以有副作用（例如把懒加载区域滚进可视范围）。不配置这两个字段的平台不做就绪判定。
 
 ---
 

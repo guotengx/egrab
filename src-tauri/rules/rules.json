@@ -1,6 +1,6 @@
 {
-  "version": 5,
-  "updated_at": "2026-09-12",
+  "version": 6,
+  "updated_at": "2026-10-28",
   "note": "EGrab 抓取规则包。修改本目录下的文件后保存，下一次抓取立即生效，无需重新编译或重装程序。",
   "platforms": [
     {
@@ -37,6 +37,8 @@
       "image_cleaner": "jd",
       "wait_js": "(function(){ return !!document.querySelector('#detail-main, #detail-top, [class*=\"scoped\"], .sku-name, [class*=\"sku-title-name\"], [class*=\"gallery\"] img, #spec-n1 img'); })()",
       "expand_js_file": "jd.expand.js",
+      "ready_js_file": "jd.ready.js",
+      "ready_timeout_ms": 10000,
       "extract_js_file": "jd.extract.js",
       "scroll": { "step": 500, "delay_ms": 300, "settle_ms": 1500, "max_height": 60000 }
     }
