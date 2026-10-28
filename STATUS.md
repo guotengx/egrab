@@ -32,6 +32,7 @@
 - **Phase 8 抓取规则外置引擎 (v0.2.0)：✅**（解析逻辑从二进制剥离到可编辑规则包，平台改版免编译热更新；同步修复 JD 主图 + 天猫价格/规格/SKU）
 - **Phase 8.1 双平台双架构构建矩阵 (v0.2.0)：✅**（macOS aarch64/x86_64 + Windows x64/ARM64，版本号统一对齐 0.2.0）
 - **Phase 8.2 用户实测修复轮 (v0.2.1)：✅**（京东规则 v3/v4 两轮校准 + Windows 安装器修复：x64 只出 MSI / mainBinaryName=EGrab / NSIS perMachine）
+- **Phase 8.3 运营实测修复轮 (v0.2.2)：✅ 代码完成，⏳ 待 CI**（京东规则 v6 + 懒加载楼层就绪判定 + 图片按真实格式保存/缩放兜底 + 日志落盘；真实页面离线回归 37/37）
 - **CI/CD build+release 合并 (v0.1.5-v0.1.6)：✅**（解决 build/release 竞态，双平台自动发布）
 
 ---
@@ -61,6 +62,9 @@
 | 19 | 双平台双架构构建矩阵（v0.2.0） | planner | ✅ 已完成 | mac aarch64/x86_64 + win x64/ARM64；ARM64 标 continue-on-error 不阻断发布 |
 | 20 | JD 规则 v3/v4 两轮校准（v0.2.1） | planner | ✅ 已完成 | v3 内容过滤(isJdProductImage/passSizeGate/分层 gallery/SKU 重写)；v4 基于真实 HTML 修 4 bug（imgzone 误杀/imagetools 拼写/scoped 过宽/播放图标）。离线回归 13/13 通过 |
 | 21 | Windows 安装器修复（v0.2.1） | planner | ✅ 已完成 | x64 只出 MSI 消除双包冲突；mainBinaryName=EGrab；NSIS perMachine+installerIcon+中文；版本号对齐 0.2.1 |
+| 22 | 运营实测反馈定位（v0.2.2） | planner | ✅ 已完成 | 28 条反馈归为 5 类根因：v4 误杀（img 自带 class shop-editor-zone-insert）、懒加载楼层未触发、PNG 存成 .jpg 致缩放丢图、多款式、拼多多标签图合规（非程序）。证据：10 份 raw.json + 3 份 MHTML + 京东前端代码 + OCR |
+| 23 | 京东规则 v6（v0.2.2） | planner | ✅ 已完成 | 新增 jd.ready.js 就绪判定；封面/店铺链接/#detail-footer/data-lazyload/选中款式/页面诊断；tests/rules 真实页面 fixture 离线回归 37/37 |
+| 24 | 抓取流程与图片处理修复（v0.2.2） | planner | ✅ 代码完成，⏳ 待 CI | bringToFront + ready 轮询 + raw.json driver/rules 段；下载按文件头存真实扩展名；缩放按内容解码、JPEG 目标去 alpha、失败复制原图；clean_jd_image_url 去尺寸前缀修正；日志写 `<app_data>/logs/egrab.log`；版本号对齐 0.2.2 |
 
 ---
 
@@ -109,7 +113,7 @@
 
 ---
 
-## 当前进行中事项（v0.2.1 发布后，更新于 2026-09-01）
+## 当前进行中事项（v0.2.2 发布，更新于 2026-10-28）
 
 | # | 事项 | 优先级 | 状态 | 说明 |
 |---|------|--------|------|------|
@@ -118,7 +122,10 @@
 | C-3 | Windows ARM64 构建可行性 | P2 | ✅ 已完成 | 交叉编译 + NSIS 打包成功。附带发现：用户曾把 ARM64 包装到 x64 机器上导致"空白图标+打不开"，属架构选错非杀软问题 |
 | C-4 | 规则包版本升级覆盖用户改动 | P2 | 📋 已文档化 | 内嵌 version 高于磁盘时会备份 `*.bak` 后覆盖。用户如需固定自改规则，须将 `rules.json` 的 `version` 改为大数（如 9999）。已写入 `rules/README.md` |
 | C-5 | 未提交的单 Agent 模式文档迁移 | P2 | 📋 待用户决策 | 工作区存在 AGENTS.md/opencode.json/contract-*.md/src\/protocols/README.md 的模式迁移改动 + 269 个已删除日志证据文件 + AGENTS.md.multi/.single/.bak*、docs/PLANNER_HANDBOOK.md 等未跟踪文件，尚未提交。**注意：v0.2.1 中 STATUS/TECH_BOARD/HISTORY 的文档更新已单独提交，不受此项阻塞** |
-| C-6 | v0.2.1 CI 构建 + 用户真机验证 | P0 | ⏳ 等待 CI/用户 | tag v0.2.1 已推送触发 CI；待用户：①装 v0.2.1 验证快捷方式/图标正常 ②抓京东商品看 raw.json counts 段（预期 gallery=5、detail_images=12、price=87 量级）③卸载 %LOCALAPPDATA%\EGrab 的错架构残留 |
+| C-6 | v0.2.1 CI 构建 + 用户真机验证 | P0 | ✅ 已完成 | v0.2.1 CI 通过并已被运营使用（10 月抓取记录显示运行的是 v0.2.1 内嵌的 v4 规则）；实测暴露的问题转入 C-7 |
+| C-7 | v0.2.2 CI 构建 + 运营验证 | P0 | ⏳ 等待 CI/用户 | tag v0.2.2 推送后：①CI 全绿 ②运营装 v0.2.2，启动后规则自动从 v4 升到 v6（设置页可见 v6）③重抓火山岩绿茶/水满香特级绿茶/有机水满香/兰贵人/火山岩红茶，raw.json 应有 rules.version=6、driver.ready=ready，detail_images 与页面一致 ④proportioned/ 不再缺 PNG 图 ⑤抓取时 Chrome 会被切到前台（预期行为） |
+| C-8 | 拼多多包装标签图合规 | P0 | 📋 非程序问题，待运营/品牌方 | 京东页面上没有合格标签图（OCR：产品信息图只有品名/产地/保质期，缺生产厂家/厂址/SC 编码）；需品牌方提供包装背面实拍；带「椰仙旗舰店」水印的图需无水印原图 |
+| C-9 | 多款式一键抓取 | P2 | 📋 待排期 | 当前需在京东页面点选款式后复制地址栏链接逐个抓（点选会 pushState 改写为该款式 skuId 链接）；DOM 上无 skuId，需引擎模拟点击（Rust + 前端 + 规则） |
 
 ---
 
@@ -295,6 +302,8 @@ kimi-k2.6（tester）在执行异步任务时，反复出现"成功态不收敛"
 | 2026-09-01 | **京东规则 v3（commit 13fc506）**：加内容过滤层——isJdProductImage（jfs/ 路径 + 噪声路径黑名单）、passSizeGate（<150px 拒收但放行 sNxN_jfs 缩略图）、inExcludedZone（recommend/comment/shop/banner 等排除区）、gallery 5 组分层第一组命中即停、封面独立取大图、SKU 重写覆盖新旧规格结构、详情 wrapper 排除区过滤。自诊断字段 gallerySample/coverUrl/rejectedSample 等。实测 item 10026681425538：gallery 2（仍混入 1 张视频播放图标）、detail 11（混入 2 张小图标）、price 87 正确、sku 1 | planner |
 | 2026-09-01 | **用户提供真实京东 HTML → 规则 v4（commit a12f306）**：基于完整 DOM 定位 4 个真 bug——① imgzone 被误列噪声路径（详情长图恰恰全在 imgzone/jfs/，v3 会全滤掉）② imgtools 拼写错误（实际 imagetools，导致播放图标漏网）③ [class*=scoped] 详情容器过宽（13 个匹配混入缩略图/图标）④ gallery 需排除 img.thumbnails-play-icon。修复后按真实 DOM 还原 stub 做离线回归 13/13 全过（gallery 5 去重无图标/封面 s1440x1440/详情 12 张全 imgzone/价格 87/SKU 带图）。规则包版本 3→4 | planner |
 | 2026-09-01 | **Windows 快捷方式失灵排查**：用户报告快捷方式无图标且打不开、目标指向 %LOCALAPPDATA%\EGrab\egrab.exe。排查结论：① v0.2.0 首次同时产出 MSI+NSIS 两个 x64 包，装到不同目录互相冲突，卸载其一留下死快捷方式 ② 用户另把 ARM64 包装到 x64 机器（文件存在但无法执行，空白图标+双击无反应），属架构选错而非杀软 ③ %LOCALAPPDATA% 未签名 exe 是杀软重点拦截对象。修复（v0.2.1，commit b6b9ef0）：x64 只出 MSI、mainBinaryName=EGrab、NSIS perMachine+installerIcon+简体中文、版本号对齐 0.2.1 | planner |
+| 2026-10-28 | **运营实测反馈定位（拼多多上架场景）**：28 条反馈（没有 detail / 没有 cover / 款式不对 / 被拼多多驳回）。证据链：9 个商品 10 份 raw.json、3 份浏览器渲染后保存的 MHTML、京东前端代码 pc_item_components_3 5.0.7、macOS Vision OCR。归为 5 类根因：① 店铺编辑器插入的详情图 `<img class="shop-editor-zone-insert">` 自身命中 `[class*="shop"]` 排除区（v5 已修但运营电脑一直是 v0.2.1 内嵌 v4，无在线更新，手动拷贝未送达）② 「商品介绍」「规格参数」是 IntersectionObserver 懒加载楼层，抓取时未触发（4 个商品 wrapperCount=0 且 specs=0）③ 京东对 .png.avif 返回 PNG，被存成 .jpg，等比缩放按扩展名解码失败后静默跳过（8 个压缩包逐文件验证 100% 对应）④ 多款式（一个链接 3 个 SKU，各有独立详情）⑤ 拼多多包装标签图要求的厂家/厂址/SC 在京东页面上根本不存在（非程序问题） | planner |
+| 2026-10-28 | **修复方案取舍：规则 v6 + v0.2.2 局部 Rust 修补，不重构**。规则外置架构本轮有效（误杀、封面、店铺链接都是改 JS）；缺口在「驱动页面渲染」和「图片文件处理」两块 Rust 代码。规则随安装包内嵌下发，启动时内嵌 v6 > 磁盘 v4 自动备份覆盖，顺带解决 v5 送不到运营电脑的问题 | planner + 人类 |
 | 2026-09-01 | **复盘结论（京东为何"之前能抓后来失灵"）**：京东 6 月→9 月一次前端改版动了两个层面——数据层（pageConfig.product 被清空）+ 表现层（CSS-Module 哈希类名变化），v0.2.0 前的解析器恰好同时依赖这两者，所以主图/价格/店铺一起丢；同期用稳定 ID（#detail-main）的详情图和规格存活，反向验证根因。架构教训（TD-009）：真正的故障不是某个选择器失效，而是"修选择器的成本太高"（改 Rust→CI 编译→重发安装包→全员重装），v0.2.0 规则外置后修复成本降为改一个文本文件 | planner |
 
 ---
@@ -510,4 +519,4 @@ module.exports = {
 
 ---
 
-*最后更新: 2026-08-29 (v0.2.0 抓取规则外置引擎 + JD/天猫解析修复 + 双平台双架构构建矩阵)*
+*最后更新: 2026-10-28 (v0.2.2 运营实测修复轮：京东规则 v6 + 懒加载就绪判定 + 图片格式/缩放修复 + 日志落盘)*

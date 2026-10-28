@@ -460,6 +460,46 @@ Phase 5 和 Phase 6 全面检查通过。代码质量良好，接口一致性全
 
 ---
 
+### TD-012: 运营实测修复轮 —— 京东规则 v6 + 抓取流程/图片格式修复（v0.2.2）
+
+- **日期**: 2026-10-28
+- **背景**: 运营把椰仙京东旗舰店的商品抓下来发布到拼多多，反馈 28 条问题。
+  证据：9 个商品 10 份 raw.json、3 份浏览器渲染完成后保存的 MHTML、
+  京东前端代码 `pc_item_components_3` 5.0.7（CDN 直接下载）、macOS Vision OCR。
+
+| # | 根因 | 证据 | 修复 |
+|---|------|------|------|
+| 1 | 店铺编辑器插入的详情图 `<img class="shop-editor-zone-insert">` 自身命中 `[class*="shop"]`（`closest()` 包含元素自己） | 真实 DOM 跑规则：v4 详情 6/7/0 张，v5 9/8/17 张。v5（9-12）已修，但运营一直用 v0.2.1 内嵌 v4（无在线更新，手动拷贝未送达） | 规则 v6 随 v0.2.2 内嵌，启动自动覆盖磁盘 v4 |
+| 2 | 「商品介绍」「规格参数」是两个独立的 IntersectionObserver 懒加载楼层（`enableInView`），抓取时未触发 | 4 个商品 `wrapperCount=0` 且 `specs=0`，主图/价格正常 | 引擎导航后 `Page.bringToFront`；滚动后轮询规则 `ready_js`（≤10s，脚本自行滚动触发楼层）；raw.json 新增 `driver`/`rules` 段，规则新增 `debug.page` |
+| 3 | 京东对 `.png.avif` 地址返回 PNG，下载器按 URL 后缀存成 `.jpg`；缩放用 `image::open` 按扩展名解码，失败即静默跳过 | 8 个压缩包逐文件查文件头：PNG 内容的 `.jpg` 全部缺失于 `proportioned/`，真 JPEG 全在 | 下载按文件头存真实扩展名；缩放 `ImageReader::with_guessed_format()`，JPEG 目标先转 RGB，解码/编码失败复制原图 |
+| 4 | 多款式：一个链接下多个 SKU，各有独立 skuId 与详情；DOM 上无 skuId | 有机水满香 3 个款式；前端代码确认点选款式时 `history.pushState` 改写地址栏 | 规则记录 `debug.skuSelected`；操作规避：点选款式后复制链接；一键抓全部款式待排期 |
+| 5 | 拼多多包装标签图要求产品名/厂家/产地/地址/保质期/SC，京东页面上不存在合格标签图 | OCR 34 张详情 + 15 张主图：「产品信息」图只有品名/产地/保质期 | 非程序问题，需品牌方提供包装背面实拍 |
+
+- **其他修正**：
+  - `parser/utils.rs::clean_jd_image_url`：`.png.avif` 分支原先提前 return，跳过去尺寸前缀，
+    meta.json 的 `original_url` 残留 `s48x48`（实际下载靠下载器第二道清洗兜住）。改为还原原格式并始终去前缀。
+  - 规则：封面改为「选中款式图 > 第 1 张缩略图 > 主图区大图」（`#spec-img` 会随鼠标悬停切换）；
+    店铺链接从 `a[href*="mall.jd.com/index-"]` 取；详情区块新增 `#detail-footer`；
+    `imgSrc` 支持 `data-lazyload` 并识别占位 src。
+  - 日志写入 `<app_data>/logs/egrab.log`（>5MB 启动时轮转）：release 包的失败任务首次有现场记录。
+- **测试**：新增 `tests/rules/`（3 个真实页面 fixture + 最小 DOM 实现），`node tests/rules/jd.test.js` 37/37；
+  Rust 新增单测（格式嗅探、扩展名替换、缩放兜底、ready 字段默认值、URL 清洗）。CI 只构建不跑 `cargo test`，见 R-6。
+- **真实结构基线（2026-10 存档）**：
+  - 详情数据来自 `pc_item_getWareGraphic`（需 h5st 签名，外部直连返回 `no access`，只能让页面自己渲染），
+    区块全集：event-zone / related-layout-head / npcitem-notice / tx-video / detail-top / detail-main /
+    detail-footer / related-layout-footer / industrial-introduction。椰仙店只有 `#detail-main`。
+  - `left-tabs-item` 下规格楼层 `.attrs .item` 与详情楼层 `#detail-main` 各自懒加载；
+    顶部「商品亮点」`.highlight-attrs .item` 首屏即有，不能当作规格楼层已加载的信号。
+  - 店铺名 `div.top-name`（无 `<a>`），店铺链接 `a[href*="mall.jd.com/index-"]`；
+    款式 `.specification-group > .specification-group-content > .specification-item-sku(--selected)`。
+- **教训**：
+  1. **规则热更新的最后一公里是分发**：v5 早已修好，但没有送达机制，运营用 v4 跑了 6 周。
+     规则修复要么随安装包内嵌发布，要么做在线更新。
+  2. **`closest()` 会命中元素自身**：类名子串排除区要考虑 `<img>` 自带的 class。
+  3. **抓到 ≠ 能用**：本轮最大的业务阻塞（拼多多标签图）不是抓取问题，用 OCR 在数据层面证实后才能剥离出去。
+
+---
+
 ### 遗留风险清单（未决，非本期修复范围）
 
 - **R-1 `identifier` 双轨隐患（2026-09-01 发现，口头承诺记录但此前漏记，现补录）**：
@@ -469,9 +509,13 @@ Phase 5 和 Phase 6 全面检查通过。代码质量良好，接口一致性全
   新版装不上（并存两个）；若改 Rust 路径会让用户已抓数据和登录态"凭空消失"。
   **需要单独设计一次数据迁移才能动，本期不动。**
 - **R-2 Windows 代码签名**：360 误报（2026-06-11 记录）的长期方案是购买 Authenticode 证书，未实施。
-- **R-3 v0.2.1 待真机验证**：CI 构建结果 + 用户实测 counts 段（预期 gallery=5 / detail=12），
-  以及 %LOCALAPPDATA%\EGrab 错架构残留需用户手动卸载。
+- **R-3 v0.2.1 待真机验证**：✅ 已关闭（2026-10-28）—— v0.2.1 已被运营实际使用，实测问题由 TD-012 / v0.2.2 处理。
+- **R-4 多款式一键抓取未实现**：同一链接下的其他款式需手动点选后复制链接逐个抓；
+  DOM 上没有 skuId，实现需要引擎模拟点击款式并逐个提取（Rust + 前端 + 规则）。
+- **R-5 规则没有在线更新**：规则修复只能随安装包内嵌下发或手动拷贝文件；v5 因此 6 周未送达运营电脑。
+- **R-6 CI 不跑 `cargo test`**：build.yml 只执行 `tauri build`，Rust 单测从未在 CI 执行，可能悄悄失效。
+  建议后续加一个 `cargo test` job（不阻断发布）。
 
 ---
 
-*最后更新: 2026-09-01 by planner (TD-011 用户实测修复轮 + R-1~R-3 遗留风险补录；TD-010 产物表已按 v0.2.1 修正)*
+*最后更新: 2026-10-28 by planner (TD-012 运营实测修复轮 v0.2.2；R-3 关闭，新增 R-4~R-6)*
