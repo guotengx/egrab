@@ -27,21 +27,29 @@
 | 模块 | 路径 | 职责 | 负责人 | 状态 | 接口定义 | 测试覆盖 |
 |------|------|------|--------|------|---------|---------|
 | models | src-tauri/src/models/ | 全局数据模型定义（与PRD 3.1.2对齐） | planner | ✅ done | L5 protocols | ✅ unit + serde (25 tests) |
-| cdp | src-tauri/src/cdp/ | CDP连接管理、WebSocket通信、页面导航 | planner | ✅ done | L5 cdp-manager | ✅ unit + serde (12 tests) |
-| scraper | src-tauri/src/scraper/ | 抓取引擎核心，协调解析器和下载器；wait/expand/scroll 参数从规则包读取 | planner | ✅ done | L5 scraper-engine | ✅ unit |
-| parser/rules | src-tauri/src/parser/rules.rs | **规则驱动的通用解析器**（v0.2.0 起替代所有平台专属解析器） | planner | ✅ done | L5 parser | ✅ unit (9 tests) |
-| rules（规则包） | src-tauri/rules/ | 外置抓取规则：rules.json + 各平台 extract/expand JS，随二进制内嵌并释放到磁盘 | planner | ✅ done | rules/README.md | ✅ 内嵌规则校验 + JS 离线回归 |
+| cdp | src-tauri/src/cdp/ | CDP连接管理、WebSocket通信、页面导航；v0.2.2 新增 `bring_to_front`（Page.bringToFront） | planner | ✅ done | L5 cdp-manager | ✅ unit + serde (12 tests) |
+| scraper | src-tauri/src/scraper/ | 抓取引擎核心，协调解析器和下载器；wait/expand/scroll/ready 参数从规则包读取；v0.2.2 起导航后切前台、滚动后轮询 ready_js，raw.json 写入 driver/rules 诊断段 | planner | ✅ done | L5 scraper-engine | ✅ unit (7 tests) |
+| parser/rules | src-tauri/src/parser/rules.rs | **规则驱动的通用解析器**（v0.2.0 起替代所有平台专属解析器）；v0.2.2 新增 ready_js / ready_js_file / ready_timeout_ms 与 `find_rule_with_source` | planner | ✅ done | L5 parser | ✅ unit (11 tests) |
+| parser/utils | src-tauri/src/parser/utils.rs | 图片 URL 清洗（淘宝/京东）、价格解析；v0.2.2 修正 `.png.avif` 清洗 | planner | ✅ done | - | ✅ unit (19 tests) |
+| rules（规则包） | src-tauri/rules/ | 外置抓取规则：rules.json + 各平台 extract/expand/ready JS，随二进制内嵌并释放到磁盘；当前 **v6**（京东新增 jd.ready.js） | planner | ✅ done | rules/README.md | ✅ 内嵌规则校验 + `tests/rules/` 真实页面离线回归 37/37 |
 | ~~parser/taobao~~ | ~~src-tauri/src/parser/taobao.rs~~ | 已于 v0.2.0 删除（558 行），逻辑迁移至 `rules/taobao.extract.js` | - | ❌ removed | - | - |
 | ~~parser/jd~~ | ~~src-tauri/src/parser/jd.rs~~ | 已于 v0.2.0 删除（727 行），逻辑迁移至 `rules/jd.extract.js` | - | ❌ removed | - | - |
-| downloader | src-tauri/src/downloader/ | 图片批量下载器（并发控制、重试） | planner | ✅ done | L5 downloader | ✅ unit |
+| downloader | src-tauri/src/downloader/ | 图片批量下载器（并发控制、重试）；v0.2.2 起按文件头识别真实格式决定扩展名 | planner | ✅ done | L5 downloader | ✅ unit (15 tests) |
 | storage | src-tauri/src/storage/ | 存档引擎（SQLite + JSON + 文件系统） | planner | ✅ done | L5 storage | ✅ unit |
 | commands | src-tauri/src/commands/ | Tauri IPC命令定义（前端可调用的接口） | planner | ✅ done | L5 ipc-commands | ✅ unit + serde (6 tests) |
 | config | src-tauri/src/config/ | 应用配置管理 | planner | ✅ done | L5 config | ✅ unit |
 | pages | src/pages/ | 页面组件（Home, Progress, Archive, Settings） | planner | ✅ done | - | ✅ tsc |
 | components | src/components/ | 可复用UI组件 | planner | ✅ done | - | ✅ tsc |
 | stores | src/stores/ | Svelte状态管理（连接状态、任务状态等） | planner | ✅ done | - | ✅ tsc |
-| resize | src-tauri/src/resize/ | 图片等比缩放（输出到 proportioned/ 子目录） | planner | ✅ done | L5 data-models | ✅ tsc |
+| resize | src-tauri/src/resize/ | 图片等比缩放（输出到 proportioned/ 子目录）；v0.2.2 起按内容解码、JPEG 目标先转 RGB、失败复制原图 | planner | ✅ done | L5 data-models | ✅ unit (2 tests) |
+| 诊断日志 | src-tauri/src/lib.rs | v0.2.2 起日志同时写 stderr 与 `<app_data>/logs/egrab.log`（>5MB 启动时轮转） | planner | ✅ done | - | - |
 | services | src/services/ | Tauri IPC调用封装 | planner | ✅ done | L5 ipc-commands | ✅ tsc |
+
+> **注（2026-10-29）**：v0.2.2 新增的 8 个 Rust 单测从未执行过：
+> - rules 2 个、utils 1 个、downloader 3 个、resize 2 个；
+> - 原因：本地没有 Rust 工具链，CI 只跑构建、不跑 `cargo test`（R-6）。
+>
+> 表中的测试数量只表示「已编写」，不表示「已通过」。
 
 ---
 
@@ -492,6 +500,16 @@ Phase 5 和 Phase 6 全面检查通过。代码质量良好，接口一致性全
     顶部「商品亮点」`.highlight-attrs .item` 首屏即有，不能当作规格楼层已加载的信号。
   - 店铺名 `div.top-name`（无 `<a>`），店铺链接 `a[href*="mall.jd.com/index-"]`；
     款式 `.specification-group > .specification-group-content > .specification-item-sku(--selected)`。
+- **更正**：v5 提交说明（b4a5f68）里写的根因「#detail-main 内嵌资质/标签子模块，class 含 shop/banner
+  （shopQualification/cert-banner）」是当时没有真实 DOM 时的推断，**不成立**。真实原因是 `<img>` 自带的
+  `shop-editor-zone-insert`。git 历史不改写，以本条为准。
+- **证据与工具（可复现）**：
+  - 证据位置见 STATUS「运营实测反馈台账」。
+  - 京东前端包：`https://storage.360buyimg.com/retail-mall/pc_item_components_3/prod/5.0.7/index-legacy-*.js`
+    （文件名从商品页 HTML 的 `<script>` 标签取）。
+  - MHTML 解析：用 Python `email` 模块取 text/html 部分。**要手动按 UTF-8 解码**，因为该部分没声明 charset，
+    默认会按 ASCII 解成乱码，导致款式名被去重成 1 个。
+  - OCR：Swift + Vision `VNRecognizeTextRequest`（zh-Hans，accurate），macOS 自带，可直接读 AVIF。
 - **教训**：
   1. **规则热更新的最后一公里是分发**：v5 早已修好，但没有送达机制，运营用 v4 跑了 6 周。
      规则修复要么随安装包内嵌发布，要么做在线更新。
@@ -516,6 +534,27 @@ Phase 5 和 Phase 6 全面检查通过。代码质量良好，接口一致性全
 - **R-6 CI 不跑 `cargo test`**：build.yml 只执行 `tauri build`，Rust 单测从未在 CI 执行，可能悄悄失效。
   建议后续加一个 `cargo test` job（不阻断发布）。
 
+以下 R-7 ~ R-14 是 2026-10 分析运营反馈时读代码发现、**本期未修复**的问题（2026-10-29 审计补录）：
+
+- **R-7 前端平台白名单比规则包窄**：`src/components/UrlInput.svelte:20-24` 写死 3 条正则
+  （item.taobao.com / detail.tmall.com / item.jd.com），规则包 `match_url` 支持的 item.m.jd.com、
+  chaoshi.detail.tmall.com、detail.tmall.hk、item.tmall.com、world.taobao.com 都会被前端拦成「不支持的平台」。
+  这削弱了「改规则即可支持新链接形态」的设计。
+- **R-8 抓取标签页句柄不自愈**：`cdp/manager.rs` 的 `active_page` 只在连接/断开时重置，导航失败不重置。
+  用户手动关掉 EGrab 打开的标签页后，后续抓取会一直失败，直到重新连接。
+- **R-9 任务状态判定过粗**：`scraper/engine.rs` 的最终状态只看下载失败数，一张图都没提取到也算 success；
+  导航失败和 `fail_task` 更新状态用的是 `try_lock`，锁被占用时任务会停在 Running。
+- **R-10 PRD 3.1.3「下载失败降级为页面显示尺寸」未实现**：`downloader/image.rs` 下载原图失败后
+  不会退回 `thumbnail_url`，图片直接丢失。
+- **R-11 淘宝多款式冲突**：淘宝 `item_id` 只取 URL 的 `id`，忽略 `skuId`，同一商品的不同款式被当成同一商品。
+  不勾强制重抓会报「已存在」；勾了会先删掉前一个款式的文件夹（`storage/mod.rs:126-139`）。
+  主图和价格取的也是整个商品，不是选中款式。
+- **R-12 京东 SKU 价格恒为 0**：`jd.extract.js` 的 skus 里 `price` 固定写 0；每个款式的 skuId 在 DOM 上拿不到（见 C-9）。
+- **R-13 京东图片清洗有两份实现**：`parser/utils.rs` 与 `downloader/image.rs` 各有一份 `clean_jd_image_url`，
+  后者没有 avif 处理，目前靠「解析时清洗一次 + 下载前再清洗一次」叠加兜底，属于技术债。
+- **R-14 `jd.expand.js` 改样式范围过宽**：对所有 `[class*="scoped"]` 元素及其全部后代强改 height/overflow，
+  可能影响页面布局；新版页面的详情图在渲染时已带真实 src，这个脚本的必要性需要重新评估。
+
 ---
 
-*最后更新: 2026-10-28 by planner (TD-012 运营实测修复轮 v0.2.2；R-3 关闭，新增 R-4~R-6)*
+*最后更新: 2026-10-29 by planner (记忆审计：模块状态表同步 v0.2.2；TD-012 补更正与证据出处；新增 R-7~R-14)*

@@ -60,7 +60,7 @@
 | 17 | JD/天猫解析故障修复（v0.2.0） | planner | ✅ 已完成 | JD 抗哈希子串选择器；天猫 price/specs/skus 取值路径修正（真实数据离线回归 8/8 通过） |
 | 18 | 页面诊断快照能力（v0.2.0） | planner | ✅ 已完成 | dump_page_snapshot + raw.json counts 段 + 设置页三按钮 |
 | 19 | 双平台双架构构建矩阵（v0.2.0） | planner | ✅ 已完成 | mac aarch64/x86_64 + win x64/ARM64；ARM64 标 continue-on-error 不阻断发布 |
-| 20 | JD 规则 v3/v4 两轮校准（v0.2.1） | planner | ✅ 已完成 | v3 内容过滤(isJdProductImage/passSizeGate/分层 gallery/SKU 重写)；v4 基于真实 HTML 修 4 bug（imgzone 误杀/imagetools 拼写/scoped 过宽/播放图标）。离线回归 13/13 通过 |
+| 20 | JD 规则 v3/v4 两轮校准（v0.2.1） | planner | ✅ 已完成 | v3 内容过滤(isJdProductImage/passSizeGate/分层 gallery/SKU 重写)；v4 基于真实 HTML 修 4 bug（imgzone 误杀/imagetools 拼写/scoped 过宽/播放图标）。离线回归 13/13 通过。后续 v5（2026-09-12，b4a5f68）：详情容器内跳过逐图排除区 + 店铺链接兜底，仅推仓库未随安装包发布 |
 | 21 | Windows 安装器修复（v0.2.1） | planner | ✅ 已完成 | x64 只出 MSI 消除双包冲突；mainBinaryName=EGrab；NSIS perMachine+installerIcon+中文；版本号对齐 0.2.1 |
 | 22 | 运营实测反馈定位（v0.2.2） | planner | ✅ 已完成 | 28 条反馈归为 5 类根因：v4 误杀（img 自带 class shop-editor-zone-insert）、懒加载楼层未触发、PNG 存成 .jpg 致缩放丢图、多款式、拼多多标签图合规（非程序）。证据：10 份 raw.json + 3 份 MHTML + 京东前端代码 + OCR |
 | 23 | 京东规则 v6（v0.2.2） | planner | ✅ 已完成 | 新增 jd.ready.js 就绪判定；封面/店铺链接/#detail-footer/data-lazyload/选中款式/页面诊断；tests/rules 真实页面 fixture 离线回归 37/37 |
@@ -118,14 +118,66 @@
 | # | 事项 | 优先级 | 状态 | 说明 |
 |---|------|--------|------|------|
 | C-1 | v0.2.0 CI 首次编译验证 | P0 | ✅ 已完成 | CI 全绿，5 个产物全部构建成功（含实验性 Windows ARM64），Rust 盲写 1053 行一次编译通过，体积全部 <15MB |
-| C-2 | JD 主图/价格选择器校准 | P0 | ✅ 已完成 | 经 v3（盲写过滤）+ v4（真实 HTML 校准）两轮修复，离线回归 13/13 通过；待用户真机最终确认 counts 段 |
+| C-2 | JD 主图/价格选择器校准 | P0 | ✅ 已完成 | 经 v3（盲写过滤）+ v4（真实 HTML 校准）两轮修复，离线回归 13/13 通过。真机结果（2026-10 运营数据）：主图/价格/规格正常，详情图暴露 v4 误杀与懒加载楼层问题，已由 v5/v6 + v0.2.2 处理，验证转入 C-7 |
 | C-3 | Windows ARM64 构建可行性 | P2 | ✅ 已完成 | 交叉编译 + NSIS 打包成功。附带发现：用户曾把 ARM64 包装到 x64 机器上导致"空白图标+打不开"，属架构选错非杀软问题 |
 | C-4 | 规则包版本升级覆盖用户改动 | P2 | 📋 已文档化 | 内嵌 version 高于磁盘时会备份 `*.bak` 后覆盖。用户如需固定自改规则，须将 `rules.json` 的 `version` 改为大数（如 9999）。已写入 `rules/README.md` |
-| C-5 | 未提交的单 Agent 模式文档迁移 | P2 | 📋 待用户决策 | 工作区存在 AGENTS.md/opencode.json/contract-*.md/src\/protocols/README.md 的模式迁移改动 + 269 个已删除日志证据文件 + AGENTS.md.multi/.single/.bak*、docs/PLANNER_HANDBOOK.md 等未跟踪文件，尚未提交。**注意：v0.2.1 中 STATUS/TECH_BOARD/HISTORY 的文档更新已单独提交，不受此项阻塞** |
+| C-5 | 未提交的单 Agent 模式文档迁移 | P2 | 📋 待用户决策 | 2026-10-29 盘点：①已修改未提交 14 个：AGENTS.md、opencode.json、docs/contract-*.md ×10、docs/protocols/README.md、src/protocols/README.md ②未跟踪 23 个：AGENTS.md.multi/.single/.bak×4、docs/contract-*.md.multi ×10、docs/PLANNER_HANDBOOK.md、bak.env、switch_mode.sh、tsc-resize.log.pid/.status、tsc-rules.log.pid/.status（后 4 个是 async_run 证据文件）③已删除未暂存 269 个：134 个 `*.log.status` + 134 个 `*.log.pid`（Phase 5~7 的 async_run 证据）+ merged_all.md。**风险**：未提交的 opencode.json 引用了未跟踪的 docs/PLANNER_HANDBOOK.md，两者必须同批提交。v0.2.1、v0.2.2 的提交都刻意避开了这些文件 |
 | C-6 | v0.2.1 CI 构建 + 用户真机验证 | P0 | ✅ 已完成 | v0.2.1 CI 通过并已被运营使用（10 月抓取记录显示运行的是 v0.2.1 内嵌的 v4 规则）；实测暴露的问题转入 C-7 |
 | C-7 | v0.2.2 CI 构建 + 运营验证 | P0 | ⏳ 等待 CI/用户 | tag v0.2.2 推送后：①CI 全绿 ②运营装 v0.2.2，启动后规则自动从 v4 升到 v6（设置页可见 v6）③重抓火山岩绿茶/水满香特级绿茶/有机水满香/兰贵人/火山岩红茶，raw.json 应有 rules.version=6、driver.ready=ready，detail_images 与页面一致 ④proportioned/ 不再缺 PNG 图 ⑤抓取时 Chrome 会被切到前台（预期行为） |
 | C-8 | 拼多多包装标签图合规 | P0 | 📋 非程序问题，待运营/品牌方 | 京东页面上没有合格标签图（OCR：产品信息图只有品名/产地/保质期，缺生产厂家/厂址/SC 编码）；需品牌方提供包装背面实拍；带「椰仙旗舰店」水印的图需无水印原图 |
 | C-9 | 多款式一键抓取 | P2 | 📋 待排期 | 当前需在京东页面点选款式后复制地址栏链接逐个抓（点选会 pushState 改写为该款式 skuId 链接）；DOM 上无 skuId，需引擎模拟点击（Rust + 前端 + 规则） |
+| C-10 | 真相源文档漂移（L1/L2/L4/L5） | P2 | 📋 待用户决策是否启动变更传导 | ①PRD 3.3.1 写数据库在 `~/.egrab/index.db`，代码与 ARCHITECTURE §8 实际是 `<app_data>/com.egrab.app/index.db` ②PRD 3.1.3「下载失败降级为页面显示尺寸」未实现（TECH_BOARD R-10）③PRD 3.1.4 目录结构没有 `proportioned/`，v0.2.2 起图片扩展名按真实格式（可能是 .png）④ARCHITECTURE §6 仍列 parser/taobao.rs、jd.rs（v0.2.0 已删），缺 src-tauri/rules/、resize/、tests/rules/ ⑤ARCHITECTURE 5.1 与 AGENTS.md §2.2 只列 11~12 个 IPC，代码实际注册 20 个；src/protocols（L5）缺 cdp_navigate/get_cover_image/get_rules_info/reload_rules/open_rules_folder/dump_page_snapshot，docs/protocols（L4）缺全部 8 个新增命令。按 AGENTS.md §2.4，L1/L2 变更须由人类发起 |
+| C-11 | 输出文件夹名带商品标题 | P3 | 📋 待用户决策（需改 PRD 3.1.4） | 运营手动给文件夹改名时把两个商品弄混（见反馈台账）；文件夹名按 PRD 是 `{platform}_{item_id}_{timestamp}` |
+
+### 运营实测反馈台账（2026-10-28，供 C-7 验证与下轮排查）
+
+**场景**：运营抓椰仙京东旗舰店的商品，发布到拼多多（自己的店不是旗舰店）。
+运营在 Windows 上用 v0.2.1（内嵌规则 v4），通过微信回传压缩包和截图；输出文件夹由运营手动改名。
+
+**证据位置**：
+- 持久：`/Users/guotengx/Downloads/未命名文件夹 2/`
+  - 9 个压缩包（`茶(1).zip` 内含其余全部，外加「火山岩红茶（口粮茶）」和早期「红茶」）
+  - 6 张微信聊天截图（链接 ↔ 压缩包 ↔ 评语）
+  - 4 张手机照片（拼多多驳回原因 + 运营备忘录 28 条）
+  - 3 份 MHTML（14010763782 / 14010613427 / 10237705257646，滚动加载完后保存）
+- 持久：`/Users/guotengx/Downloads/红茶/`（14010763782 在 09-06 的抓取结果，v5 定位用）
+- 仓库：`tests/rules/fixtures/`（上述 3 份 MHTML 解析出的 DOM）
+- 临时，会被系统清理，不可依赖：`$TMPDIR/opencode/egrab/fb1028`（解压出的 json、京东前端包）、
+  `$TMPDIR/opencode/egrab/mht`（DOM 解析脚本、OCR 工具 ocr.swift 及结果）
+
+**商品与文件夹对照**（有两处文件夹名与内容对调）：
+
+| 京东 item | 实际商品（页面标题） | 运营文件夹名 | 抓取日期 | 当时结果 | 根因 |
+|---|---|---|---|---|---|
+| 14010763782 | 火山岩正宗红茶 特级 50g | 火山岩红茶 | 10-26 | 详情 6，丢 3 张编辑器插入图（含产品信息图） | ① |
+| 14010613427 | 火山岩特色绿茶嫩芽 50g | 火山岩绿茶 | 10-26 | 详情 0、规格 0 | ②（产品信息图也是编辑器图 ①） |
+| 34676906089 | 正宗兰贵人乌龙茶 100g | 兰贵人 | 10-23 | 详情 0、规格 0 | ② |
+| 10236660720704 | 五指山春绿茶 水满特级 250g | 水满香特技绿茶 | 10-26 | 详情 0、规格 0 | ② |
+| 10237705257646 | 五指山有机红茶礼盒 80g（3 款式：有机红茶 / 有机绿茶 / 澄迈苦丁茶） | 有机水满香 | 10-26 | 详情 0；封面是 PNG，没进 proportioned | ②③④ |
+| 10059988995855 | 黎王红红茶 雨林大叶种 180g | 有机黎王红（高端礼盒） | 09-13 | 详情 0（12 张全被误杀）；1 张 PNG 主图丢失 | ①③ |
+| 10171689581 | 古树火山岩红茶 大叶种 250g | **水满香红茶（名不副实）** | 09-13 | 详情 0（11 张全被误杀） | ① + 命名对调 |
+| 1444522840 | 五指山水满红茶 口粮茶 250g | **火山岩红茶（口粮茶）（名不副实）** | 09-13 | 正常（详情 11），但被拼多多驳回 | ⑤ + 命名对调 |
+| 10073656082037 | 澄迈苦丁茶嫩芽 冬青大叶苦丁茶 60g | 瓜芦苦丁茶 | 09-13 | 详情 9 正常；封面是 PNG，没进 proportioned | ③ |
+| 1444464280 | 未知（聊天里只发了链接和「被驳回」） | — | — | 无数据 | 待确认 |
+
+根因编号：① v4 误杀编辑器插入图 ② 懒加载楼层未触发 ③ PNG 存成 .jpg 导致缩放丢图 ④ 多款式 ⑤ 拼多多标签图合规（非程序）
+
+**28 条反馈逐条归类**（运营备忘录 2026-10-27，`#` 为备忘录顺序）：
+
+| 类别 | 条目 | 状态 |
+|---|---|---|
+| v0.2.2 应已修复（7 条） | #2 火山岩红茶没提取出标签图、#3 火山岩绿茶没有 detail 和标签图、#8 有机水满香红茶没有 detail、#9 水满香特级绿茶没有 detail、#11 有机黎王红没有 detail、#12 有机水满香红茶 cover 和 detail 都没有、#18 瓜芦苦丁茶没有 cover | ⏳ C-7 重抓验证 |
+| 无数据，v0.2.2 后重抓再看（4 条） | #4 辣木茶没有 detail、#20 热带雨林大叶红种茶叶没有 detail（可能就是黎王红，标题含「雨林大叶种红茶」）、#23 冬青科没有 detail（瓜芦苦丁茶标题含「冬青」但详情正常，可能是另一个链接）、#28 斑斓红茶只有一张图 | 📋 需链接 / raw.json |
+| 款式 / 链接问题（8 条） | #13 有机水满香绿茶没有产品（是 10237705257646 的款式）、#14 有机白茶产品不对（该链接第 3 个款式是澄迈苦丁茶，不是白茶）、#24 火山岩古树红茶款式不对、#25 水满红款式不对（这两条对应文件夹名对调）、#27 大叶种红茶款式不对且提取不出图、#15 大叶红茶、#16 金宣绿茶、#17 大叶红茶+金宣绿茶（后三条无评语） | 📋 先点选款式再复制链接；需运营提供链接 |
+| 没有商品（5 条） | #6 火山岩绿茶（口粮茶）、#10 水满香白牡丹、#21 野生老树绿茶（新中式）、#22 野生老树红茶（新中式）、#26 华夏早春绿茶 | 📋 无链接；可能是别的商品下的款式，或京东没上架 |
+| 拼多多审核，非程序（3 条） | #1 澄迈苦丁茶上传标签图仍被驳回、#5 苦丁茶+绿茶/兰贵人被驳回、#7 火山岩红茶（口粮茶）全部上传仍被驳回 | 📋 C-8 |
+| 待确认（1 条） | #19 椰仙茗茶礼品盒详细标签图尺寸不对 | 📋 需拼多多报错原文 / 尺寸规范 |
+
+另外，拼多多驳回截图里还有一条「非旗舰店请删除『旗舰店』相关表述」：火山岩红茶的主图和详情图带「椰仙旗舰店」水印（C-8）。
+
+**标签图在哪**：火山岩红茶 `detail_008`、火山岩绿茶 `detail_007`、有机水满香 `detail_010`（产品参数表）。
+v5/v6 都能抓到，但内容只有品名、产地、保质期等，**缺生产厂家、厂址、SC 编码**，达不到拼多多要求。
+这个结论来自 OCR（34 张详情图 + 15 张主图原图），页面其他区域也没有资质或标签楼层。
 
 ---
 
@@ -302,9 +354,12 @@ kimi-k2.6（tester）在执行异步任务时，反复出现"成功态不收敛"
 | 2026-09-01 | **京东规则 v3（commit 13fc506）**：加内容过滤层——isJdProductImage（jfs/ 路径 + 噪声路径黑名单）、passSizeGate（<150px 拒收但放行 sNxN_jfs 缩略图）、inExcludedZone（recommend/comment/shop/banner 等排除区）、gallery 5 组分层第一组命中即停、封面独立取大图、SKU 重写覆盖新旧规格结构、详情 wrapper 排除区过滤。自诊断字段 gallerySample/coverUrl/rejectedSample 等。实测 item 10026681425538：gallery 2（仍混入 1 张视频播放图标）、detail 11（混入 2 张小图标）、price 87 正确、sku 1 | planner |
 | 2026-09-01 | **用户提供真实京东 HTML → 规则 v4（commit a12f306）**：基于完整 DOM 定位 4 个真 bug——① imgzone 被误列噪声路径（详情长图恰恰全在 imgzone/jfs/，v3 会全滤掉）② imgtools 拼写错误（实际 imagetools，导致播放图标漏网）③ [class*=scoped] 详情容器过宽（13 个匹配混入缩略图/图标）④ gallery 需排除 img.thumbnails-play-icon。修复后按真实 DOM 还原 stub 做离线回归 13/13 全过（gallery 5 去重无图标/封面 s1440x1440/详情 12 张全 imgzone/价格 87/SKU 带图）。规则包版本 3→4 | planner |
 | 2026-09-01 | **Windows 快捷方式失灵排查**：用户报告快捷方式无图标且打不开、目标指向 %LOCALAPPDATA%\EGrab\egrab.exe。排查结论：① v0.2.0 首次同时产出 MSI+NSIS 两个 x64 包，装到不同目录互相冲突，卸载其一留下死快捷方式 ② 用户另把 ARM64 包装到 x64 机器（文件存在但无法执行，空白图标+双击无反应），属架构选错而非杀软 ③ %LOCALAPPDATA% 未签名 exe 是杀软重点拦截对象。修复（v0.2.1，commit b6b9ef0）：x64 只出 MSI、mainBinaryName=EGrab、NSIS perMachine+installerIcon+简体中文、版本号对齐 0.2.1 | planner |
-| 2026-10-28 | **运营实测反馈定位（拼多多上架场景）**：28 条反馈（没有 detail / 没有 cover / 款式不对 / 被拼多多驳回）。证据链：9 个商品 10 份 raw.json、3 份浏览器渲染后保存的 MHTML、京东前端代码 pc_item_components_3 5.0.7、macOS Vision OCR。归为 5 类根因：① 店铺编辑器插入的详情图 `<img class="shop-editor-zone-insert">` 自身命中 `[class*="shop"]` 排除区（v5 已修但运营电脑一直是 v0.2.1 内嵌 v4，无在线更新，手动拷贝未送达）② 「商品介绍」「规格参数」是 IntersectionObserver 懒加载楼层，抓取时未触发（4 个商品 wrapperCount=0 且 specs=0）③ 京东对 .png.avif 返回 PNG，被存成 .jpg，等比缩放按扩展名解码失败后静默跳过（8 个压缩包逐文件验证 100% 对应）④ 多款式（一个链接 3 个 SKU，各有独立详情）⑤ 拼多多包装标签图要求的厂家/厂址/SC 在京东页面上根本不存在（非程序问题） | planner |
-| 2026-10-28 | **修复方案取舍：规则 v6 + v0.2.2 局部 Rust 修补，不重构**。规则外置架构本轮有效（误杀、封面、店铺链接都是改 JS）；缺口在「驱动页面渲染」和「图片文件处理」两块 Rust 代码。规则随安装包内嵌下发，启动时内嵌 v6 > 磁盘 v4 自动备份覆盖，顺带解决 v5 送不到运营电脑的问题 | planner + 人类 |
 | 2026-09-01 | **复盘结论（京东为何"之前能抓后来失灵"）**：京东 6 月→9 月一次前端改版动了两个层面——数据层（pageConfig.product 被清空）+ 表现层（CSS-Module 哈希类名变化），v0.2.0 前的解析器恰好同时依赖这两者，所以主图/价格/店铺一起丢；同期用稳定 ID（#detail-main）的详情图和规格存活，反向验证根因。架构教训（TD-009）：真正的故障不是某个选择器失效，而是"修选择器的成本太高"（改 Rust→CI 编译→重发安装包→全员重装），v0.2.0 规则外置后修复成本降为改一个文本文件 | planner |
+| 2026-09-12 | **京东规则 v5（commit b4a5f68）**：POP 商品 14010763782（火山岩红茶 50g）有 3 张 790px 详情图被 `excluded_zone` 误杀（raw.json rejectedSample 证据；下载原图确认是 790×823~904 的完整详情/标签图）。修复：详情容器（#detail-main 等）内逐图不再做排除区检查（skipZone）+ 店铺链接在容器内找 `<a>` 兜底；规则包 4→5，临时 DOM stub 回归 13/13（临时目录已被系统清理，已由 `tests/rules/` 取代）。**当时的根因推断「资质子模块 class 含 shop/banner」写进了提交说明，但不准确**——10-28 用真实 DOM 证实是 `<img>` 自带 `class="shop-editor-zone-insert"`，修法恰好覆盖。v5 只推到仓库并让用户手动拷贝到规则目录，没有随安装包发布，后来证实没送到运营电脑（TECH_BOARD R-5） | planner |
+| 2026-10-28 | **运营实测反馈定位（拼多多上架场景）**：28 条反馈（没有 detail / 没有 cover / 款式不对 / 被拼多多驳回）。证据链：9 个商品 10 份 raw.json、3 份浏览器渲染后保存的 MHTML、京东前端代码 pc_item_components_3 5.0.7、macOS Vision OCR。归为 5 类根因：① 店铺编辑器插入的详情图 `<img class="shop-editor-zone-insert">` 自身命中 `[class*="shop"]` 排除区（v5 已修但运营电脑一直是 v0.2.1 内嵌 v4，无在线更新，手动拷贝未送达）② 「商品介绍」「规格参数」是 IntersectionObserver 懒加载楼层，抓取时未触发（4 个商品 wrapperCount=0 且 specs=0）③ 京东对 .png.avif 返回 PNG，被存成 .jpg，等比缩放按扩展名解码失败后静默跳过（8 个压缩包逐文件验证 100% 对应）④ 多款式（一个链接 3 个 SKU，各有独立详情）⑤ 拼多多包装标签图要求的厂家/厂址/SC 在京东页面上根本不存在（非程序问题）。逐条对应见下方「运营实测反馈台账」 | planner |
+| 2026-10-28 | **修复方案取舍：规则 v6 + v0.2.2 局部 Rust 修补，不重构**。规则外置架构本轮有效（误杀、封面、店铺链接都是改 JS）；缺口在「驱动页面渲染」和「图片文件处理」两块 Rust 代码。规则随安装包内嵌下发，启动时内嵌 v6 > 磁盘 v4 自动备份覆盖，顺带解决 v5 送不到运营电脑的问题 | planner + 人类 |
+| 2026-10-28 | **v0.2.2 实施与发布**：规则 v6（af077f9）+ Rust 修补（7a5bcc9）+ 文档（dfe4844），tag v0.2.2 已推送触发 CI。本地无 Rust 工具链，Rust 侧 7 个文件为盲写；用到的外部 API（chromiumoxide 0.9.1 `Page::bring_to_front`、image 0.25.10 `ImageReader::with_guessed_format`、tracing-subscriber 0.3.23 `MakeWriterExt::and` + `Mutex<File>`）已逐一对照 docs.rs 核实。CI 只构建不跑 `cargo test`。JS 侧真实页面离线回归 37/37 | planner |
+| 2026-10-29 | **记忆体系审计（停机前查漏补缺）**：补录 v5（09-12）决策与历史条目；修正决策记录日期顺序；新增「运营实测反馈台账」与证据位置；刷新 C-2/C-5；补登分析阶段发现但未修复的项目问题（TECH_BOARD R-7~R-14）与真相源漂移（C-10）；TECH_BOARD 模块状态表同步到 v0.2.2。本轮不改任何代码 | planner |
 
 ---
 
@@ -519,4 +574,4 @@ module.exports = {
 
 ---
 
-*最后更新: 2026-10-28 (v0.2.2 运营实测修复轮：京东规则 v6 + 懒加载就绪判定 + 图片格式/缩放修复 + 日志落盘)*
+*最后更新: 2026-10-29 (记忆体系审计：补录 v5、修正决策记录顺序、新增运营反馈台账、C-2/C-5 刷新、新增 C-10/C-11；v0.2.2 已推送待 CI)*
