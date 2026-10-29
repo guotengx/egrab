@@ -123,7 +123,7 @@
 | C-4 | 规则包版本升级覆盖用户改动 | P2 | 📋 已文档化 | 内嵌 version 高于磁盘时会备份 `*.bak` 后覆盖。用户如需固定自改规则，须将 `rules.json` 的 `version` 改为大数（如 9999）。已写入 `rules/README.md` |
 | C-5 | 未提交的单 Agent 模式文档迁移 | P2 | 📋 待用户决策 | 2026-10-29 盘点：①已修改未提交 14 个：AGENTS.md、opencode.json、docs/contract-*.md ×10、docs/protocols/README.md、src/protocols/README.md ②未跟踪 23 个：AGENTS.md.multi/.single/.bak×4、docs/contract-*.md.multi ×10、docs/PLANNER_HANDBOOK.md、bak.env、switch_mode.sh、tsc-resize.log.pid/.status、tsc-rules.log.pid/.status（后 4 个是 async_run 证据文件）③已删除未暂存 269 个：134 个 `*.log.status` + 134 个 `*.log.pid`（Phase 5~7 的 async_run 证据）+ merged_all.md。**风险**：未提交的 opencode.json 引用了未跟踪的 docs/PLANNER_HANDBOOK.md，两者必须同批提交。v0.2.1、v0.2.2 的提交都刻意避开了这些文件 |
 | C-6 | v0.2.1 CI 构建 + 用户真机验证 | P0 | ✅ 已完成 | v0.2.1 CI 通过并已被运营使用（10 月抓取记录显示运行的是 v0.2.1 内嵌的 v4 规则）；实测暴露的问题转入 C-7 |
-| C-7 | v0.2.2 CI 构建 + 运营验证 | P0 | ⏳ 等待 CI/用户 | tag v0.2.2 推送后：①CI 全绿 ②运营装 v0.2.2，启动后规则自动从 v4 升到 v6（设置页可见 v6）③重抓火山岩绿茶/水满香特级绿茶/有机水满香/兰贵人/火山岩红茶，raw.json 应有 rules.version=6、driver.ready=ready，detail_images 与页面一致 ④proportioned/ 不再缺 PNG 图 ⑤抓取时 Chrome 会被切到前台（预期行为） |
+| C-7 | v0.2.2 CI 构建 + 运营验证 | P0 | ⏳ 等待 CI/用户 | tag v0.2.2 推送后：①CI 全绿 ②运营装 v0.2.2，启动后规则自动从 v4 升到 v6（设置页可见 v6）③重抓火山岩绿茶/水满香特级绿茶/有机水满香/兰贵人/火山岩红茶，raw.json 应有 rules.version=6、driver.ready=ready，detail_images 与页面一致 ④proportioned/ 不再缺 PNG 图 ⑤抓取时 Chrome 会被切到前台（预期行为）⑥部分封面/主图文件扩展名会变成 .png（按真实格式保存，预期行为）⑦以前抓的文件夹不用重抓：在存档里点一次「等比缩放」，就能补回 proportioned/ 里缺的 PNG 图 ⑧仍有问题时回传：该商品的 raw.json + `%APPDATA%\com.egrab.app\logs\egrab.log`。**CI 失败时的应急方案**：规则 v6 能单独用在 v0.2.1 上（旧程序会忽略 ready 字段），手动拷到运营电脑的 `%APPDATA%\com.egrab.app\rules\` 可先解决误杀、封面和店铺链接；楼层没加载（②）和 PNG 丢图（③）必须等 v0.2.2 |
 | C-8 | 拼多多包装标签图合规 | P0 | 📋 非程序问题，待运营/品牌方 | 京东页面上没有合格标签图（OCR：产品信息图只有品名/产地/保质期，缺生产厂家/厂址/SC 编码）；需品牌方提供包装背面实拍；带「椰仙旗舰店」水印的图需无水印原图 |
 | C-9 | 多款式一键抓取 | P2 | 📋 待排期 | 当前需在京东页面点选款式后复制地址栏链接逐个抓（点选会 pushState 改写为该款式 skuId 链接）；DOM 上无 skuId，需引擎模拟点击（Rust + 前端 + 规则） |
 | C-10 | 真相源文档漂移（L1/L2/L4/L5） | P2 | 📋 待用户决策是否启动变更传导 | ①PRD 3.3.1 写数据库在 `~/.egrab/index.db`，代码与 ARCHITECTURE §8 实际是 `<app_data>/com.egrab.app/index.db` ②PRD 3.1.3「下载失败降级为页面显示尺寸」未实现（TECH_BOARD R-10）③PRD 3.1.4 目录结构没有 `proportioned/`，v0.2.2 起图片扩展名按真实格式（可能是 .png）④ARCHITECTURE §6 仍列 parser/taobao.rs、jd.rs（v0.2.0 已删），缺 src-tauri/rules/、resize/、tests/rules/ ⑤ARCHITECTURE 5.1 与 AGENTS.md §2.2 只列 11~12 个 IPC，代码实际注册 20 个；src/protocols（L5）缺 cdp_navigate/get_cover_image/get_rules_info/reload_rules/open_rules_folder/dump_page_snapshot，docs/protocols（L4）缺全部 8 个新增命令。按 AGENTS.md §2.4，L1/L2 变更须由人类发起 |
@@ -178,6 +178,13 @@
 **标签图在哪**：火山岩红茶 `detail_008`、火山岩绿茶 `detail_007`、有机水满香 `detail_010`（产品参数表）。
 v5/v6 都能抓到，但内容只有品名、产地、保质期等，**缺生产厂家、厂址、SC 编码**，达不到拼多多要求。
 这个结论来自 OCR（34 张详情图 + 15 张主图原图），页面其他区域也没有资质或标签楼层。
+
+OCR 原文摘录（可以直接拿给运营或品牌方看）：
+- 火山岩红茶 detail_008：【品名】火山岩红茶【配料】海南大叶种工夫红茶嫩芽（111号）【质量等级】特级【净含量】50g【保质期】二年【生产日期】近期日期【产地】海南省澄迈县【贮存方法】避光、防潮、无异味处贮存；下方 3 张小照片（外包装封膜 / 精装小袋 / 茶盒背面），其中「茶盒背面」里的文字识别不出来。
+- 火山岩绿茶 detail_007：版式同上，品名为火山岩绿茶，配料为海南大叶种炒青精制茶嫩芽（111号）。
+- 有机水满香 detail_010：产品参数表，内容为名称（水满香红茶）、配料（大叶工夫红茶）、等级（特级）、规格（80g）、保质期（2年）、贮存方法（避免阳光直射）。
+
+另：兰贵人.zip 的 `proportioned/gallery/resources/background_clothing_conf/icon/` 下有一批 png 和 `.jpg-lx2` 文件，是运营用别的工具写进去的，不是 EGrab 的输出，与本次问题无关。
 
 ---
 
@@ -359,7 +366,7 @@ kimi-k2.6（tester）在执行异步任务时，反复出现"成功态不收敛"
 | 2026-10-28 | **运营实测反馈定位（拼多多上架场景）**：28 条反馈（没有 detail / 没有 cover / 款式不对 / 被拼多多驳回）。证据链：9 个商品 10 份 raw.json、3 份浏览器渲染后保存的 MHTML、京东前端代码 pc_item_components_3 5.0.7、macOS Vision OCR。归为 5 类根因：① 店铺编辑器插入的详情图 `<img class="shop-editor-zone-insert">` 自身命中 `[class*="shop"]` 排除区（v5 已修但运营电脑一直是 v0.2.1 内嵌 v4，无在线更新，手动拷贝未送达）② 「商品介绍」「规格参数」是 IntersectionObserver 懒加载楼层，抓取时未触发（4 个商品 wrapperCount=0 且 specs=0）③ 京东对 .png.avif 返回 PNG，被存成 .jpg，等比缩放按扩展名解码失败后静默跳过（8 个压缩包逐文件验证 100% 对应）④ 多款式（一个链接 3 个 SKU，各有独立详情）⑤ 拼多多包装标签图要求的厂家/厂址/SC 在京东页面上根本不存在（非程序问题）。逐条对应见下方「运营实测反馈台账」 | planner |
 | 2026-10-28 | **修复方案取舍：规则 v6 + v0.2.2 局部 Rust 修补，不重构**。规则外置架构本轮有效（误杀、封面、店铺链接都是改 JS）；缺口在「驱动页面渲染」和「图片文件处理」两块 Rust 代码。规则随安装包内嵌下发，启动时内嵌 v6 > 磁盘 v4 自动备份覆盖，顺带解决 v5 送不到运营电脑的问题 | planner + 人类 |
 | 2026-10-28 | **v0.2.2 实施与发布**：规则 v6（af077f9）+ Rust 修补（7a5bcc9）+ 文档（dfe4844），tag v0.2.2 已推送触发 CI。本地无 Rust 工具链，Rust 侧 7 个文件为盲写；用到的外部 API（chromiumoxide 0.9.1 `Page::bring_to_front`、image 0.25.10 `ImageReader::with_guessed_format`、tracing-subscriber 0.3.23 `MakeWriterExt::and` + `Mutex<File>`）已逐一对照 docs.rs 核实。CI 只构建不跑 `cargo test`。JS 侧真实页面离线回归 37/37 | planner |
-| 2026-10-29 | **记忆体系审计（停机前查漏补缺）**：补录 v5（09-12）决策与历史条目；修正决策记录日期顺序；新增「运营实测反馈台账」与证据位置；刷新 C-2/C-5；补登分析阶段发现但未修复的项目问题（TECH_BOARD R-7~R-14）与真相源漂移（C-10）；TECH_BOARD 模块状态表同步到 v0.2.2。本轮不改任何代码 | planner |
+| 2026-10-29 | **记忆体系审计（停机前查漏补缺）**：补录 v5（09-12）决策与历史条目；修正决策记录日期顺序；新增「运营实测反馈台账」与证据位置；刷新 C-2/C-5；补登分析阶段发现但未修复的项目问题（TECH_BOARD R-7~R-14）与真相源漂移（C-10）；TECH_BOARD 模块状态表同步到 v0.2.2。本轮不改任何代码（commit 1e12f5b）。同日二次复核补充：C-7 补救/回传/应急方案、台账加入标签图 OCR 原文、TD-012 补证据采集方法与结构细节、R-1 补日志目录依赖；并核实前端 5 秒进度看门狗不会被就绪等待误触发 | planner |
 
 ---
 
@@ -574,4 +581,4 @@ module.exports = {
 
 ---
 
-*最后更新: 2026-10-29 (记忆体系审计：补录 v5、修正决策记录顺序、新增运营反馈台账、C-2/C-5 刷新、新增 C-10/C-11；v0.2.2 已推送待 CI)*
+*最后更新: 2026-10-29 (记忆体系审计 + 二次复核：补录 v5、修正决策记录顺序、运营反馈台账（含标签图 OCR 原文）、C-2/C-5/C-7 刷新、新增 C-10/C-11；v0.2.2 已推送，CI 结果未知)*

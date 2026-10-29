@@ -80,6 +80,8 @@
 
 > **注**：v0.2.0 新增的 4 个规则/诊断命令属于运维辅助接口，未写入 L2 ARCHITECTURE 5.1 的核心 IPC 表，
 > 不影响 AGENTS.md §2.2 的命名一致性铁律（该铁律约束的是 12 个核心业务命令）。
+> 实际上 cdp_navigate / delete_task / get_cover_image / resize_images 也不在 L2 表里；
+> L4/L5 协议层同样缺失。完整漂移清单见 STATUS C-10（2026-10-29 补充）。
 
 ---
 
@@ -500,6 +502,20 @@ Phase 5 和 Phase 6 全面检查通过。代码质量良好，接口一致性全
     顶部「商品亮点」`.highlight-attrs .item` 首屏即有，不能当作规格楼层已加载的信号。
   - 店铺名 `div.top-name`（无 `<a>`），店铺链接 `a[href*="mall.jd.com/index-"]`；
     款式 `.specification-group > .specification-group-content > .specification-item-sku(--selected)`。
+  - 详情图在渲染时就带真实 src：前端把 `graphicContent` 里的 `data-lazyload=` 整体替换成 `src=`，
+    新版页面不存在逐图懒加载，只有楼层级懒加载。
+  - 图片地址里的 `.jpg.avif` / `.png.avif` 是前端在 `localStorage.avif === "true"` 时追加的转码后缀，
+    去掉即为原格式原图。
+  - 资质接口 `pc_qualification_life_v2` 只返回商家营业执照链接，不含商品标签图，佐证了 C-8 的结论。
+  - 匿名 curl 商品页只拿到约 35KB 的客户端渲染空壳；商品数据全部来自带 h5st 签名的接口。
+  - 排查前先看商品页 HTML 引用的前端包版本号，本次是 5.0.7。版本变了，就要重新核对上面这些结构。
+- **影响评估**：
+  - 每次抓取 Chrome 窗口会被切到前台。
+  - 最坏情况下每个商品多等约 10.8 秒（就绪超时 10 秒 + 800 毫秒），可能逼近 PRD 4.1「单商品 < 30 秒」。
+  - 前端进度看门狗（`tasks.svelte.ts` 中 `PROGRESS_TIMEOUT_MS = 5_000`）只在收到第一个进度事件之前生效，
+    不会被就绪等待误触发（已核实）。
+- **拼多多侧参考**：开放平台 `pdd.goods.detail.get` 新增了 `package_label_gallery_list` 字段（包装标签图）。
+  食品类必须单独上传包装标签图，生产商、保质期、许可证号等要清晰可见。以后如果做「导出到拼多多」可以参考。
 - **更正**：v5 提交说明（b4a5f68）里写的根因「#detail-main 内嵌资质/标签子模块，class 含 shop/banner
   （shopQualification/cert-banner）」是当时没有真实 DOM 时的推断，**不成立**。真实原因是 `<img>` 自带的
   `shop-editor-zone-insert`。git 历史不改写，以本条为准。
@@ -510,6 +526,14 @@ Phase 5 和 Phase 6 全面检查通过。代码质量良好，接口一致性全
   - MHTML 解析：用 Python `email` 模块取 text/html 部分。**要手动按 UTF-8 解码**，因为该部分没声明 charset，
     默认会按 ASCII 解成乱码，导致款式名被去重成 1 个。
   - OCR：Swift + Vision `VNRecognizeTextRequest`（zh-Hans，accurate），macOS 自带，可直接读 AVIF。
+  - **找用户要页面证据的标准做法**（按推荐顺序）：
+    1. 浏览器里滚动到底、等商品介绍加载完，然后「另存为 → 网页，单个文件（.mhtml）」。保存的是渲染后的 DOM，图片原地址不变，还内嵌了已加载的图片。
+    2. EGrab 设置页「导出页面快照」。注意它只读 EGrab 控制的那个标签页，要在那个标签页里手动滚完再点。
+    3. DevTools 控制台执行 `copy(document.documentElement.outerHTML)`。
+    
+    **不要用**「查看网页源代码」：拿到的只是客户端渲染空壳 `<div id="root">`。**不要用**「另存为 网页，全部」：会把图片地址改写成本地文件。
+  - 临时分析产物在 `$TMPDIR/opencode/egrab/{fb1028,mht}`（解压的 json、前端包、OCR 结果），会被系统清理；
+    结论已写入本条和 STATUS 台账，原始证据在用户的 Downloads 目录。
 - **教训**：
   1. **规则热更新的最后一公里是分发**：v5 早已修好，但没有送达机制，运营用 v4 跑了 6 周。
      规则修复要么随安装包内嵌发布，要么做在线更新。
@@ -526,6 +550,8 @@ Phase 5 和 Phase 6 全面检查通过。代码质量良好，接口一致性全
   一旦改用 Tauri 官方 path API 就会指向另一个目录；若改 identifier 会变更 MSI UpgradeCode 导致
   新版装不上（并存两个）；若改 Rust 路径会让用户已抓数据和登录态"凭空消失"。
   **需要单独设计一次数据迁移才能动，本期不动。**
+  补充（2026-10-29）：v0.2.2 新增的日志目录 `<app_data>/logs/` 同样位于硬编码的 `com.egrab.app` 下，
+  将来迁移时也要一并处理。
 - **R-2 Windows 代码签名**：360 误报（2026-06-11 记录）的长期方案是购买 Authenticode 证书，未实施。
 - **R-3 v0.2.1 待真机验证**：✅ 已关闭（2026-10-28）—— v0.2.1 已被运营实际使用，实测问题由 TD-012 / v0.2.2 处理。
 - **R-4 多款式一键抓取未实现**：同一链接下的其他款式需手动点选后复制链接逐个抓；
@@ -557,4 +583,4 @@ Phase 5 和 Phase 6 全面检查通过。代码质量良好，接口一致性全
 
 ---
 
-*最后更新: 2026-10-29 by planner (记忆审计：模块状态表同步 v0.2.2；TD-012 补更正与证据出处；新增 R-7~R-14)*
+*最后更新: 2026-10-29 by planner (记忆审计 + 二次复核：模块状态表同步 v0.2.2；TD-012 补更正、证据采集方法、结构细节、影响评估；R-1 补日志目录；新增 R-7~R-14)*
